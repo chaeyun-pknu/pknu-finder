@@ -5,7 +5,7 @@ about: 프로젝트에서 발견한 버그를 제보해주세요
 title: "[BUG] "
 labels: bug
 assignees: ''
--------------
+---
 
 ## 🚨 문제 상황
 
