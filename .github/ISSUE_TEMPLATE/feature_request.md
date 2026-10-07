@@ -1,6 +1,6 @@
 ---
 
-name: 기능 이슈
+name: 🔧기능 이슈
 about: 추가하거나 개선하고 싶은 기능을 제안합니다
 title: "[FEATURE] "
 labels: feature
