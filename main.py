@@ -1,11 +1,11 @@
 import streamlit as st
 from database import init_db, get_username
-# from views.mypage.user import create_user, check_login
+from views.mypage.user import create_user, check_login
 # from views.mypage.mypage import render_mypage
 # from views.home.home import render_home  # 홈 화면 임포트
 # from views.search.search import render_search
 # from views.chat.chat import render_chat
-# from views.registration.registration import render_registration
+# from views.register.register import render_register
 
 # 데이터베이스 초기화
 init_db()
@@ -28,6 +28,7 @@ if "current_menu" not in st.session_state:
 
 
 # 초기 접속 시 로그인/회원가입 화면 렌더링
+
 def render_auth_page():
     st.title("PKNU Finder 로그인 / 회원가입")
 
@@ -78,6 +79,7 @@ def main():
         render_auth_page()
         return
 
+
     #사이드바
 
     st.sidebar.title("PKNU Finder")
@@ -119,7 +121,7 @@ def main():
     # 메뉴 선택에 따른 화면 라우팅
     if st.session_state.current_menu == "홈":
         st.title("홈화면")
-        st.write("등록된 분실물 정보를 검색하는 공간입니다.")  # << 임시 화면 출력용 코드
+        st.write("홈화면 개발 예정")  # << 임시 화면 출력용 코드
         # render_home()  # views/home/home.py 함수 호출 << 추후 코드 작성 후 주석 제거 바람
 
     elif st.session_state.current_menu == "분실물/습득물 검색":
@@ -130,7 +132,7 @@ def main():
     elif st.session_state.current_menu == "분실물/습득물 등록":
         st.title("분실물/습득물 등록")
         st.write("분실물 등록 화면 개발 예정") # << 임시 화면 출력용 코드
-        # render_registration() << 추후 코드 작성 후 주석 제거 바람
+        # render_register() << 추후 코드 작성 후 주석 제거 바람
 
     elif st.session_state.current_menu == "채팅":
         st.title("채팅")
