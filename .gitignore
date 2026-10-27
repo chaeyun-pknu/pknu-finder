@@ -217,6 +217,14 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# User uploads
+uploads/
+media/
+
+# Logs
+logs/
+*.log
+
 # ---- 프로젝트 추가 항목 ----
 config.py # 토큰·키를 넣는 파일 (config_example.py 만 올림)
 data/*.csv
