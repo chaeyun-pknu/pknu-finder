@@ -515,5 +515,4 @@ def render_register():
 
                     st.info(
                         "현재는 등록 UI 테스트 단계입니다. "
-                        "SQLite 저장 기능은 다음 이슈에서 연결합니다."
                     )
