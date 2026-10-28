@@ -1,148 +1,215 @@
 import streamlit as st
-from database import init_db, get_username
-from views.mypage.user import create_user, check_login
-# from views.mypage.mypage import render_mypage
-# from views.home.home import render_home  # 홈 화면 임포트
-# from views.search.search import render_search
-# from views.chat.chat import render_chat
-# from views.register.register import render_register
 
-# 데이터베이스 초기화
-init_db()
-
-# 페이지 기본 설정
 st.set_page_config(
     page_title="PKNU Finder",
-    page_icon="images/pknulogo.png",
+    page_icon="docs\\images\\pknulogo.png",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
-# 세션 상태 초기화
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "user_id" not in st.session_state:
-    st.session_state.user_id = None
-if "current_menu" not in st.session_state:
-    st.session_state.current_menu = "홈"
+from database import (
+    DatabaseConfigurationError,
+    DatabaseOperationError,
+    get_username,
+    init_db,
+)
+from views.mypage.user import check_login, create_user
+
+# 각 폴더, 파일 별 ui 작업 후 render_home, render_search, render_register, render_chat, render_mypage를 import하여 사용. 주석 제거 바람
+from views.home.home import render_home
+#from views.search.search import render_search
+#from views.register.register import render_register
+#from views.chat.chat import render_chat
+#from views.mypage.mypage import render_mypage
 
 
-# 초기 접속 시 로그인/회원가입 화면 렌더링
+MENU_OPTIONS = [
+    "홈",
+    "분실물/습득물 검색",
+    "분실물/습득물 등록",
+    "채팅",
+    "마이페이지",
+]
 
-def render_auth_page():
-    st.title("PKNU Finder 로그인 / 회원가입")
 
-    tab_login, tab_signup = st.tabs(["로그인", "회원가입"])
+def initialize_session_state() -> None:
+    defaults = {
+        "logged_in": False,
+        "user_id": None,
+        "current_menu": "홈",
+    }
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
 
-    with tab_login:
+
+def render_auth_page() -> None:
+    st.title("PKNU Finder")
+    st.caption("부경대학교 분실물·습득물 찾기 서비스")
+    login_tab, signup_tab = st.tabs(["로그인", "회원가입"])
+
+    with login_tab:
         st.subheader("로그인")
-        login_username = st.text_input("아이디", key="login_username")
-        login_password = st.text_input("비밀번호", type="password", key="login_password")
-        
-        if st.button("로그인", type="primary"):
-            if login_username and login_password:
-                user_id = check_login(login_username, login_password)
-                if user_id:
-                    st.session_state.logged_in = True
-                    st.session_state.user_id = user_id
-                    st.session_state.current_menu = "홈"  # 로그인 직후 홈으로 설정
-                    st.success(f"환영합니다, {login_username}님!")
-                    st.rerun()
-                else:
-                    st.error("아이디 또는 비밀번호가 올바르지 않습니다.")
-            else:
+        with st.form("login_form"):
+            login_username = st.text_input("아이디", key="login_username")
+            login_password = st.text_input(
+                "비밀번호", type="password", key="login_password"
+            )
+            login_submitted = st.form_submit_button("로그인", type="primary")
+
+        if login_submitted:
+            login_username = login_username.strip()
+            if not login_username or not login_password:
                 st.warning("아이디와 비밀번호를 모두 입력해주세요.")
-
-    with tab_signup:
-        st.subheader("회원가입")
-        signup_username = st.text_input("사용할 아이디", key="signup_username")
-        signup_password = st.text_input("사용할 비밀번호", type="password", key="signup_password")
-        signup_password_confirm = st.text_input("비밀번호 확인", type="password", key="signup_password_confirm")
-
-        if st.button("회원가입 하기"):
-            if signup_username and signup_password:
-                if signup_password != signup_password_confirm:
-                    st.error("비밀번호가 일치하지 않습니다.")
-                else:
-                    success = create_user(signup_username, signup_password)
-                    if success:
-                        st.success("회원가입이 완료되었습니다! 로그인 탭에서 로그인해주세요.")
-                    else:
-                        st.error("이미 존재하는 아이디입니다.")
             else:
+                try:
+                    user_id = check_login(login_username, login_password)
+                except Exception as exc:
+                    st.error("로그인에 실패했습니다. Supabase 설정과 users 테이블을 확인해주세요.")
+                    st.caption(f"오류 내용: {exc}")
+                else:
+                    if user_id is None:
+                        st.error("아이디 또는 비밀번호가 올바르지 않습니다.")
+                    else:
+                        st.session_state.logged_in = True
+                        st.session_state.user_id = user_id
+                        st.session_state.current_menu = "홈"
+                        st.rerun()
+
+    with signup_tab:
+        st.subheader("회원가입")
+        with st.form("signup_form"):
+            signup_username = st.text_input("사용할 아이디", key="signup_username")
+            signup_password = st.text_input(
+                "사용할 비밀번호", type="password", key="signup_password"
+            )
+            signup_password_confirm = st.text_input(
+                "비밀번호 확인",
+                type="password",
+                key="signup_password_confirm",
+            )
+            signup_submitted = st.form_submit_button("회원가입")
+
+        if signup_submitted:
+            signup_username = signup_username.strip()
+            if not signup_username or not signup_password or not signup_password_confirm:
                 st.warning("모든 항목을 입력해주세요.")
+            elif signup_password != signup_password_confirm:
+                st.error("비밀번호가 일치하지 않습니다.")
+            else:
+                try:
+                    created = create_user(signup_username, signup_password)
+                except Exception as exc:
+                    st.error("회원가입에 실패했습니다. Supabase 설정과 users 테이블을 확인해주세요.")
+                    st.exception(exc)
+                    st.caption(f"오류 내용: {exc}")
+                else:
+                    if created:
+                        st.success("회원가입이 완료되었습니다. 로그인 탭에서 로그인해주세요.")
+                    else:
+                        st.error("이미 사용 중인 아이디이거나 회원가입을 완료하지 못했습니다.")
 
 
-def main():
-    # 로그인이 되어있지 않은 경우 로그인/회원가입 화면 표시
-    if not st.session_state.logged_in:
-        render_auth_page()
-        return
+def logout() -> None:
+    st.session_state.logged_in = False
+    st.session_state.user_id = None
+    st.session_state.current_menu = "홈"
+    for key in (
+        "login_username",
+        "login_password",
+        "signup_username",
+        "signup_password",
+        "signup_password_confirm",
+    ):
+        st.session_state.pop(key, None)
+    st.rerun()
+
+# 랜더링 함수들을 각 메뉴에 맞게 구현 후 주석 제거 바람
+def render_selected_page(menu: str) -> None:
+    if menu == "홈":
+        #st.title("홈")
+        #st.info("홈 화면은 준비 중입니다.")
+        render_home()
+    elif menu == "마이페이지":
+        st.title("마이페이지")
+        st.info("마이페이지는 준비 중입니다.")
+        #render_mypage()
+    elif menu == "분실물/습득물 검색":
+        st.title("분실물/습득물 검색")
+        st.info("검색 화면은 준비 중입니다.")
+        #render_search()
+    elif menu == "분실물/습득물 등록":
+        st.title("분실물/습득물 등록")
+        st.info("등록 화면은 준비 중입니다.")
+        #render_register()
+    elif menu == "채팅":
+        st.title("채팅")
+        st.info("채팅 화면은 준비 중입니다.")
+        #render_chat()
+    else:
+        st.warning("선택한 메뉴를 찾을 수 없습니다.")
 
 
-    #사이드바
-
+def render_app() -> None:
     st.sidebar.title("PKNU Finder")
     st.sidebar.markdown("---")
 
-    # 메뉴 목록
-    menu_options = ["홈", "분실물/습득물 검색", "분실물/습득물 등록", "채팅", "마이페이지"]
-    
-    # 현재 선택된 메뉴가 세션 상태에 없으면 기본값으로 "홈" 설정
-    if st.session_state.current_menu not in menu_options:
-        st.session_state.current_menu = "홈"
-    default_index = menu_options.index(st.session_state.current_menu)
+    current_menu = st.session_state.get("current_menu", "홈")
+    if current_menu not in MENU_OPTIONS:
+        current_menu = "홈"
+        st.session_state.current_menu = current_menu
 
-    menu = st.sidebar.radio(
-        "메뉴 선택", 
-        menu_options,
-        index=default_index
+    selected_menu = st.sidebar.radio(
+        "메뉴 선택",
+        MENU_OPTIONS,
+        index=MENU_OPTIONS.index(current_menu),
+        key="menu_radio",
     )
-    
-    # 메뉴 선택 변경 >  세션 상태 업데이트 > 페이지 새로고침
-    if menu != st.session_state.current_menu:
-        st.session_state.current_menu = menu
-        st.rerun()
+    st.session_state.current_menu = selected_menu
 
     st.sidebar.markdown("---")
+    try:
+        username = get_username(st.session_state.user_id)
+    except Exception:
+        username = None
 
-    # 접속 계정 표시
-    current_username = get_username(st.session_state.user_id)
-    st.sidebar.text(f"접속 계정: {current_username}님")
+    st.sidebar.write(f"접속 계정: {username}님" if username else "접속 계정")
+    if st.sidebar.button("로그아웃", use_container_width=True):
+        logout()
 
-    # 로그아웃 버튼
-    if st.sidebar.button("로그아웃", type="secondary", use_container_width=True):
-        st.session_state.logged_in = False
-        st.session_state.user_id = None
-        st.session_state.current_menu = "홈"
-        st.success("로그아웃되었습니다.")
-        st.rerun()
+    render_selected_page(selected_menu)
 
-    # 메뉴 선택에 따른 화면 라우팅
-    if st.session_state.current_menu == "홈":
-        st.title("홈화면")
-        st.write("홈화면 개발 예정")  # << 임시 화면 출력용 코드
-        # render_home()  # views/home/home.py 함수 호출 << 추후 코드 작성 후 주석 제거 바람
 
-    elif st.session_state.current_menu == "분실물/습득물 검색":
-        st.title("분실물/습득물 검색")
-        st.write("분실물 검색 화면 개발 예정") # << 임시 화면 출력용 코드
-        # render_search() << 추후 코드 작성 후 주석 제거 바람
+# 메인 함수 오류 확인 등
+def main() -> None:
+    initialize_session_state()
+    try:
+        init_db()
+    except DatabaseConfigurationError as exc:
+        st.error("Supabase 연결 설정이 필요합니다.")
+        st.code(str(exc))
+        st.info(
+            ".streamlit/secrets.toml에 SUPABASE_URL과 "
+            "SUPABASE_SERVICE_ROLE_KEY를 설정해주세요."
+        )
+        st.stop()
+    except DatabaseOperationError as exc:
+        st.error("Supabase 데이터베이스를 확인하지 못했습니다.")
+        st.code(str(exc))
+        st.info(
+            "supabase_schema.sql을 Supabase SQL Editor에서 실행했는지, "
+            "필수 테이블 이름과 권한이 올바른지 확인해주세요."
+        )
+        st.stop()
+    except Exception as exc:
+        st.error("Supabase 초기화 중 오류가 발생했습니다.")
+        st.code(str(exc))
+        st.stop()
 
-    elif st.session_state.current_menu == "분실물/습득물 등록":
-        st.title("분실물/습득물 등록")
-        st.write("분실물 등록 화면 개발 예정") # << 임시 화면 출력용 코드
-        # render_register() << 추후 코드 작성 후 주석 제거 바람
-
-    elif st.session_state.current_menu == "채팅":
-        st.title("채팅")
-        st.write("채팅 화면 개발 예정") # << 임시 화면 출력용 코드
-        # render_chat() << 추후 코드 작성 후 주석 제거 바람
-
-    elif st.session_state.current_menu == "마이페이지":
-        st.title("마이페이지")
-        st.write("마이페이지 화면 개발 예정") # << 임시 화면 출력용 코드
-        #render_mypage() << 추후 코드 작성 후 주석 제거 바람
+    if st.session_state.logged_in:
+        render_app()
+    else:
+        render_auth_page()
 
 
 if __name__ == "__main__":
