@@ -16,7 +16,7 @@ from database import (
 from views.mypage.user import check_login, create_user
 
 # 각 폴더, 파일 별 ui 작업 후 render_home, render_search, render_register, render_chat, render_mypage를 import하여 사용. 주석 제거 바람
-#from views.home.home import render_home
+from views.home.home import render_home
 #from views.search.search import render_search
 #from views.register.register import render_register
 #from views.chat.chat import render_chat
@@ -127,9 +127,9 @@ def logout() -> None:
 # 랜더링 함수들을 각 메뉴에 맞게 구현 후 주석 제거 바람
 def render_selected_page(menu: str) -> None:
     if menu == "홈":
-        st.title("홈")
-        st.info("홈 화면은 준비 중입니다.")
-        #render_home()
+        #st.title("홈")
+        #st.info("홈 화면은 준비 중입니다.")
+        render_home()
     elif menu == "마이페이지":
         st.title("마이페이지")
         st.info("마이페이지는 준비 중입니다.")
