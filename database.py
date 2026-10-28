@@ -1,103 +1,118 @@
+"""
+Supabase 접속 설정을 관리하는 모듈.
+필수 설정(.streamlit/secrets.toml):
+    SUPABASE_URL = "https://<project-ref>.supabase.co"
+    SUPABASE_SERVICE_ROLE_KEY = "<server-secret-key>"
+"""
+
+from __future__ import annotations
 import hashlib
-import sqlite3
-from datetime import datetime, timedelta
+import os
+from functools import lru_cache
+from typing import Any
 
-DB_NAME = "pkunfinder.db" #DB이름 pknufinder.db로 임시 설정함.
+import streamlit as st
+from supabase import Client, create_client
 
-# 데이터베이스 테이블 생성 시 필요한 상수
-CATEGORIES = ["전자기기", "지갑/카드", "의류", "도서/문구", "기타"] # 카테고리 수정 필요
-LOCATIONS = ["인문사회과학대학", "공학관", "중앙도서관", "학생회관", "대운동장", "청운관"] #장소 추가 필요
-STATUSES = ["습득", "보관중", "수령완료"]
 
-# 데이터베이스 연결 및 초기화
-def get_connection():
-    conn = sqlite3.connect(DB_NAME, check_same_thread=False)
-    conn.execute("PRAGMA foreign_keys = ON")
-    return conn
+class DatabaseConfigurationError(RuntimeError):
+    """Supabase 접속 설정이 없거나 잘못된 경우 발생합니다."""
 
-# 데이터베이스 초기화
-def init_db():
-    with get_connection() as conn:
-        cursor = conn.cursor()
 
-        # 유저테이블
-        # - id: 유저 고유 번호, 자동 증가
-        # - username: 유저 아이디 (중복 불가)
-        # - password: 암호화(해싱)된 비밀번호 
-        cursor.execute(
-            """
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL
-        )"""
+class DatabaseOperationError(RuntimeError):
+    """Supabase 요청이 실패한 경우 발생합니다."""
+
+
+# 환경 변수 또는 Streamlit secrets에서 설정 값을 가져오는 함수
+def _get_setting(name: str) -> str | None:
+    try:
+        value = st.secrets.get(name)
+        if value:
+            return str(value).strip()
+    except (FileNotFoundError, RuntimeError, AttributeError):
+        pass
+
+    value = os.getenv(name)
+    return value.strip() if value else None
+
+
+# Supabase 클라이언트 생성 및 캐싱
+@lru_cache(maxsize=1)
+def get_supabase_client() -> Client:
+    url = _get_setting("SUPABASE_URL")
+    key = _get_setting("SUPABASE_SERVICE_ROLE_KEY")
+
+    if not url:
+        raise DatabaseConfigurationError(
+            "SUPABASE_URL이 설정되지 않았습니다. "
+            ".streamlit/secrets.toml을 확인해주세요."
         )
 
-        # 분실물 테이블  필요시 한희님/유진님 수정
-        # - title: 글 제목 / 물건 이름
-        # - description: 상세 설명
-        # - category: 물건 카테고리 (전자기기, 지갑/카드 등) 위에서 상수 설정, 추후 드롭바 사용
-        # - location: 습득/분실 위치 / 위에서 상수 설정, 추후 드롭바 사용
-        # - lost_date: 습득/분실 날짜
-        # - status: 상태 (습득, 보관중, 수령완료) / 위에 상수 설정 완료, 드롭바 사용
-        # - created_at: 게시글 작성 시각 (기본값: 현재 시간)
-        # - user_id: 작성자 ID (users.id 참조 외래키)
-        cursor.execute(
-            """
-        CREATE TABLE IF NOT EXISTS lost_items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            description TEXT,
-            category TEXT NOT NULL,
-            location TEXT,
-            lost_date TEXT,
-            status TEXT DEFAULT '습득',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-        )"""
+    if not key:
+        raise DatabaseConfigurationError(
+            "SUPABASE_SERVICE_ROLE_KEY가 설정되지 않았습니다. "
+            ".streamlit/secrets.toml을 확인해주세요."
         )
 
-        # 채팅 테이블  필요 시 채윤님 수정
-        # - item_id: 분실물 게시글 ID (lost_items.id 참조)
-        # - user_id: 메시지 작성자 ID (users.id 참조)
-        # - message: 채팅 내용
-        # - timestamp: 전송 시각
-        cursor.execute(
-            """
-        CREATE TABLE IF NOT EXISTS chats (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            item_id INTEGER NOT NULL,
-            user_id INTEGER NOT NULL,
-            message TEXT NOT NULL,
-            timestamp TEXT,
-            FOREIGN KEY(item_id) REFERENCES lost_items(id) ON DELETE CASCADE,
-            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-        )"""
+    try:
+        return create_client(url, key)
+    except Exception as exc:
+        raise DatabaseConfigurationError(
+            "Supabase 클라이언트를 생성하지 못했습니다. "
+            "프로젝트 URL과 서버용 키를 확인해주세요."
+        ) from exc
+
+# Supabase 클라이언트 반환 함수
+def get_connection() -> Client:
+    return get_supabase_client()
+
+
+# 테이블 접근 확인 함수
+def init_db() -> None:
+    client = get_supabase_client()
+    required_tables = ("users", "lost_items", "lost_item_images", "chats", "bookmarks")
+    missing_tables: list[str] = []
+
+    for table_name in required_tables:
+        try:
+            client.table(table_name).select("*").limit(1).execute()
+        except Exception:
+            missing_tables.append(table_name)
+
+    if missing_tables:
+        missing = ", ".join(missing_tables)
+        raise DatabaseOperationError(
+            f"Supabase 테이블을 조회할 수 없습니다: {missing}. "
+            "테이블 존재 여부, RLS 정책, API 권한을 확인해주세요."
         )
 
-        # 북마크 테이블
-        cursor.execute(
-            """
-        CREATE TABLE IF NOT EXISTS bookmarks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            item_id INTEGER NOT NULL,
-            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
-            FOREIGN KEY(item_id) REFERENCES lost_items(id) ON DELETE CASCADE,
-            UNIQUE(user_id, item_id)
-        )"""
-        )
 
-        conn.commit()
-
-# 사용자 인증 관련 함수
+# 비밀번호 해싱
 def hash_password(password: str) -> str:
+    if not isinstance(password, str):
+        raise TypeError("password는 문자열이어야 합니다.")
+
     return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
 
-def get_username(user_id):
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT username FROM users WHERE id=?", (user_id,))
-        result = cursor.fetchone()
-        return result[0] if result else None
+# 사용자 이름 조회
+def get_username(user_id: int | str | None) -> str | None:
+    if user_id is None:
+        return None
+
+    try:
+        response: Any = (
+            get_supabase_client()
+            .table("users")
+            .select("username")
+            .eq("id", user_id)
+            .limit(1)
+            .execute()
+        )
+    except Exception as exc:
+        raise DatabaseOperationError(
+            f"사용자 이름 조회 실패: {exc}"
+        ) from exc
+
+    rows = response.data or []
+    return rows[0].get("username") if rows else None
