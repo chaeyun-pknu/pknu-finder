@@ -2,5 +2,3 @@
 matplotlib
 streamlit
 supabase
-datetime
-timedelta
