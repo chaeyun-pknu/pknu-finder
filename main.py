@@ -5,7 +5,7 @@ from views.mypage.user import create_user, check_login
 # from views.home.home import render_home  # 홈 화면 임포트
 # from views.search.search import render_search
 # from views.chat.chat import render_chat
-# from views.register.register import render_register
+from views.register.register import render_register
 
 # 데이터베이스 초기화
 init_db()
@@ -130,9 +130,7 @@ def main():
         # render_search() << 추후 코드 작성 후 주석 제거 바람
 
     elif st.session_state.current_menu == "분실물/습득물 등록":
-        st.title("분실물/습득물 등록")
-        st.write("분실물 등록 화면 개발 예정") # << 임시 화면 출력용 코드
-        # render_register() << 추후 코드 작성 후 주석 제거 바람
+        render_register() 
 
     elif st.session_state.current_menu == "채팅":
         st.title("채팅")
