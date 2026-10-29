@@ -1,4 +1,5 @@
 import streamlit as st
+from views.mypage.social_button import render_social_login_buttons
 
 st.set_page_config(
     page_title="PKNU Finder",
@@ -12,8 +13,16 @@ from database import (
     DatabaseOperationError,
     get_username,
     init_db,
+    get_supabase_client,
 )
-from views.mypage.user import check_login, create_user
+
+from views.mypage.auth import (
+    get_oauth_login_url,
+    handle_oauth_callback,
+    logout_user,
+    get_current_user_profile,
+    render_email_auth_form
+)
 
 # 각 폴더, 파일 별 ui 작업 후 render_home, render_search, render_register, render_chat, render_mypage를 import하여 사용. 주석 제거 바람
 from views.home.home import render_home
@@ -36,6 +45,7 @@ def initialize_session_state() -> None:
     defaults = {
         "logged_in": False,
         "user_id": None,
+        "user" : None,
         "current_menu": "홈",
     }
     for key, value in defaults.items():
@@ -46,74 +56,32 @@ def initialize_session_state() -> None:
 def render_auth_page() -> None:
     st.title("PKNU Finder")
     st.caption("부경대학교 분실물·습득물 찾기 서비스")
-    login_tab, signup_tab = st.tabs(["로그인", "회원가입"])
 
-    with login_tab:
-        st.subheader("로그인")
-        with st.form("login_form"):
-            login_username = st.text_input("아이디", key="login_username")
-            login_password = st.text_input(
-                "비밀번호", type="password", key="login_password"
-            )
-            login_submitted = st.form_submit_button("로그인", type="primary")
+    #Github, Google 로그인 URL 가져오기
+    supabase = get_supabase_client()
+    github_url = get_oauth_login_url(supabase, "github")
+    google_url = get_oauth_login_url(supabase, "google")
 
-        if login_submitted:
-            login_username = login_username.strip()
-            if not login_username or not login_password:
-                st.warning("아이디와 비밀번호를 모두 입력해주세요.")
-            else:
-                try:
-                    user_id = check_login(login_username, login_password)
-                except Exception as exc:
-                    st.error("로그인에 실패했습니다. Supabase 설정과 users 테이블을 확인해주세요.")
-                    st.caption(f"오류 내용: {exc}")
-                else:
-                    if user_id is None:
-                        st.error("아이디 또는 비밀번호가 올바르지 않습니다.")
-                    else:
-                        st.session_state.logged_in = True
-                        st.session_state.user_id = user_id
-                        st.session_state.current_menu = "홈"
-                        st.rerun()
+    # 소셜 로그인 랜더링
+    render_social_login_buttons(
+        google_url=google_url,
+        github_url=github_url,
+    )
 
-    with signup_tab:
-        st.subheader("회원가입")
-        with st.form("signup_form"):
-            signup_username = st.text_input("사용할 아이디", key="signup_username")
-            signup_password = st.text_input(
-                "사용할 비밀번호", type="password", key="signup_password"
-            )
-            signup_password_confirm = st.text_input(
-                "비밀번호 확인",
-                type="password",
-                key="signup_password_confirm",
-            )
-            signup_submitted = st.form_submit_button("회원가입")
-
-        if signup_submitted:
-            signup_username = signup_username.strip()
-            if not signup_username or not signup_password or not signup_password_confirm:
-                st.warning("모든 항목을 입력해주세요.")
-            elif signup_password != signup_password_confirm:
-                st.error("비밀번호가 일치하지 않습니다.")
-            else:
-                try:
-                    created = create_user(signup_username, signup_password)
-                except Exception as exc:
-                    st.error("회원가입에 실패했습니다. Supabase 설정과 users 테이블을 확인해주세요.")
-                    st.exception(exc)
-                    st.caption(f"오류 내용: {exc}")
-                else:
-                    if created:
-                        st.success("회원가입이 완료되었습니다. 로그인 탭에서 로그인해주세요.")
-                    else:
-                        st.error("이미 사용 중인 아이디이거나 회원가입을 완료하지 못했습니다.")
-
+    #email 로그인 랜더링
+    render_email_auth_form()
+        
+    st.markdown("---")
 
 def logout() -> None:
+    supabase = get_supabase_client()
+    logout_user(supabase)
+
     st.session_state.logged_in = False
     st.session_state.user_id = None
+    st.sessinon_state.user = None
     st.session_state.current_menu = "홈"
+    
     for key in (
         "login_username",
         "login_password",
@@ -127,8 +95,6 @@ def logout() -> None:
 # 랜더링 함수들을 각 메뉴에 맞게 구현 후 주석 제거 바람
 def render_selected_page(menu: str) -> None:
     if menu == "홈":
-        #st.title("홈")
-        #st.info("홈 화면은 준비 중입니다.")
         render_home()
     elif menu == "마이페이지":
         st.title("마이페이지")
@@ -168,10 +134,19 @@ def render_app() -> None:
     st.session_state.current_menu = selected_menu
 
     st.sidebar.markdown("---")
-    try:
-        username = get_username(st.session_state.user_id)
-    except Exception:
-        username = None
+
+
+    # 계정 이름 표시 (GitHub OAuth 유저 / DB 유저 통합)
+    profile = get_current_user_profile()
+    username = None
+    
+    if profile:
+        username = profile.get("nickname")
+    elif st.session_state.get("user_id"):
+        try:
+            username = get_username(st.session_state.user_id)
+        except Exception:
+            username = None
 
     st.sidebar.write(f"접속 계정: {username}님" if username else "접속 계정")
     if st.sidebar.button("로그아웃", use_container_width=True):
@@ -206,6 +181,15 @@ def main() -> None:
         st.code(str(exc))
         st.stop()
 
+    #OAuth 콜백 파라미터 체크 및 자동 로그인 세션 교환
+    supabase = get_supabase_client()
+    handle_oauth_callback(supabase)
+
+    # 로그인 여부 확인
+    if st.session_state.get("user") is not None:
+        st.session_state.logged_in = True
+    
+    #로그인 여부에 따른 화면 랜더링
     if st.session_state.logged_in:
         render_app()
     else:

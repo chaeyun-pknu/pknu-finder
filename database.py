@@ -5,12 +5,8 @@ Supabase 접속 설정을 관리하는 모듈.
     SUPABASE_SERVICE_ROLE_KEY = "<server-secret-key>"
 """
 
-from __future__ import annotations
-import hashlib
 import os
-from functools import lru_cache
-from typing import Any
-
+from typing import Any, Optional, Dict
 import streamlit as st
 from supabase import Client, create_client
 
@@ -22,97 +18,114 @@ class DatabaseConfigurationError(RuntimeError):
 class DatabaseOperationError(RuntimeError):
     """Supabase 요청이 실패한 경우 발생합니다."""
 
-
-# 환경 변수 또는 Streamlit secrets에서 설정 값을 가져오는 함수
-def _get_setting(name: str) -> str | None:
-    try:
-        value = st.secrets.get(name)
-        if value:
-            return str(value).strip()
-    except (FileNotFoundError, RuntimeError, AttributeError):
-        pass
-
-    value = os.getenv(name)
-    return value.strip() if value else None
-
-
 # Supabase 클라이언트 생성 및 캐싱
-@lru_cache(maxsize=1)
+@st.cache_resource
 def get_supabase_client() -> Client:
-    url = _get_setting("SUPABASE_URL")
-    key = _get_setting("SUPABASE_SERVICE_ROLE_KEY")
+    supabase_url = None
+    supabase_key = None
 
-    if not url:
-        raise DatabaseConfigurationError(
-            "SUPABASE_URL이 설정되지 않았습니다. "
-            ".streamlit/secrets.toml을 확인해주세요."
+    # st.secrets 설정값 확인 (SUPABASE_SERVICE_ROLE_KEY 또는 SUPABASE_KEY 지원)
+    if "supabase" in st.secrets:
+        supabase_url = st.secrets["supabase"].get("SUPABASE_URL")
+        supabase_key = (
+            st.secrets["supabase"].get("SUPABASE_SERVICE_ROLE_KEY")
+            or st.secrets["supabase"].get("SUPABASE_KEY")
+            or st.secrets["supabase"].get("SUPABASE_ANON_KEY")
         )
 
-    if not key:
+    # st.secrets에 없으면 환경 변수 확인
+    if not supabase_url:
+        supabase_url = os.getenv("SUPABASE_URL")
+    if not supabase_key:
+        supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
+
+    if not supabase_url or not supabase_key:
         raise DatabaseConfigurationError(
-            "SUPABASE_SERVICE_ROLE_KEY가 설정되지 않았습니다. "
-            ".streamlit/secrets.toml을 확인해주세요."
+            "Supabase URL 또는 API Key가 설정되지 않았습니다. "
+            ".streamlit/secrets.toml 파일을 확인해 주세요."
         )
 
     try:
-        return create_client(url, key)
+        return create_client(supabase_url, supabase_key)
     except Exception as exc:
-        raise DatabaseConfigurationError(
-            "Supabase 클라이언트를 생성하지 못했습니다. "
-            "프로젝트 URL과 서버용 키를 확인해주세요."
-        ) from exc
-
-# Supabase 클라이언트 반환 함수
-def get_connection() -> Client:
-    return get_supabase_client()
+        raise DatabaseConfigurationError(f"Supabase 클라이언트 생성 실패: {exc}") from exc
 
 
-# 테이블 접근 확인 함수
+# Supabase 연결 테스트 및 초기화
 def init_db() -> None:
     client = get_supabase_client()
-    required_tables = ("users", "lost_items", "lost_item_images", "chats", "bookmarks")
-    missing_tables: list[str] = []
-
-    for table_name in required_tables:
-        try:
-            client.table(table_name).select("*").limit(1).execute()
-        except Exception:
-            missing_tables.append(table_name)
-
-    if missing_tables:
-        missing = ", ".join(missing_tables)
-        raise DatabaseOperationError(
-            f"Supabase 테이블을 조회할 수 없습니다: {missing}. "
-            "테이블 존재 여부, RLS 정책, API 권한을 확인해주세요."
-        )
+    try:
+        # 간단한 핑/쿼리로 테이블 접근 가능 여부 테스트
+        _ = client.table("users").select("id").limit(1).execute()
+    except Exception as exc:
+        raise DatabaseOperationError(f"데이터베이스 연결 검증 실패: {exc}") from exc
 
 
-# 비밀번호 해싱
-def hash_password(password: str) -> str:
-    if not isinstance(password, str):
-        raise TypeError("password는 문자열이어야 합니다.")
-
-    return hashlib.sha256(password.encode("utf-8")).hexdigest()
-
-
-# 사용자 이름 조회
-def get_username(user_id: int | str | None) -> str | None:
-    if user_id is None:
+# userid 기반 username 조회
+def get_username(user_id: Any) -> Optional[str]:
+    if not user_id:
         return None
 
+    client = get_supabase_client()
     try:
-        response: Any = (
-            get_supabase_client()
-            .table("users")
+        response = (
+            client.table("users")
             .select("username")
             .eq("id", user_id)
-            .limit(1)
+            .maybe_single()
             .execute()
         )
+        if response and response.data:
+            return response.data.get("username")
+        return None
     except Exception as exc:
-        raise DatabaseOperationError(
-            f"사용자 이름 조회 실패: {exc}"
-        ) from exc
+        # DB 조회 실패 시 None 반환 혹은 예외 기록
+        st.caption(f"사용자 정보 조회 중 오류: {exc}")
+        return None
 
-    rows = response.data or []
-    return rows[0].get("username") if rows else None
+
+# userid 기반 사용자 정보 조회
+def get_user_by_id(user_id: Any) -> Optional[Dict[str, Any]]:
+    if not user_id:
+        return None
+
+    client = get_supabase_client()
+    try:
+        response = (
+            client.table("users")
+            .select("*")
+            .eq("id", user_id)
+            .maybe_single()
+            .execute()
+        )
+        if response and response.data:
+            return response.data
+        return None
+    except Exception as exc:
+        st.caption(f"사용자 상세 조회 중 오류: {exc}")
+        return None
+
+
+# Supabase 관리 클라이언트 생성 및 캐싱
+@st.cache_resource
+def get_supabase_admin_client() -> Client:
+    if "supabase" in st.secrets:
+        supabase_url = st.secrets["supabase"].get("SUPABASE_URL")
+        service_role_key = st.secrets["supabase"].get(
+            "SUPABASE_SERVICE_ROLE_KEY"
+        )
+    else:
+        supabase_url = os.getenv("SUPABASE_URL")
+        service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+    if not supabase_url or not service_role_key:
+        raise DatabaseConfigurationError(
+            "Supabase URL 또는 SERVICE_ROLE_KEY가 설정되지 않았습니다."
+        )
+
+    try:
+        return create_client(supabase_url, service_role_key)
+    except Exception as exc:
+        raise DatabaseConfigurationError(
+            f"Supabase 관리 클라이언트 생성 실패: {exc}"
+        ) from exc
