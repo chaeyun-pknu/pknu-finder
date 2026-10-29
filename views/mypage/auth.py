@@ -1,6 +1,9 @@
+import secrets
+import time
+
 import streamlit as st
-from supabase import Client
-from database import get_supabase_admin_client, get_supabase_client
+
+from database import create_auth_client, get_supabase_admin_client
 
 
 # OAuth 인증 후 리다이렉트 주소 설정
@@ -14,90 +17,115 @@ def _get_redirect_url() -> str:
         return default_url
 
 
+_FLOW_TTL_SEC = 60 * 60
+@st.cache_resource
+def _flow_store() -> dict:
+    """flow_key -> (client, login_url, 생성 시각). 서버 프로세스 메모리에 보관."""
+    return {}
+
+
+def _prune_flows(store: dict) -> None:
+    now = time.time()
+    for key, (_, _, created) in list(store.items()):
+        if now - created > _FLOW_TTL_SEC:
+            store.pop(key, None)
+
+
+def _build_redirect_url(flow_key: str) -> str:
+    base = _get_redirect_url()
+    sep = "&" if "?" in base else "?"
+    return f"{base}{sep}flow={flow_key}"
+
+
 # OAuth 제공자 로그인 URL 설정
-def get_oauth_login_url(supabase: Client, provider: str) -> str | None:
+def get_oauth_login_url(provider: str) -> str | None:
     try:
-        res = supabase.auth.sign_in_with_oauth(
+        store = _flow_store()
+        flows = st.session_state.get("oauth_flows") or {}
+
+        # 같은 세션의 rerun에서는 기존 링크를 재사용
+        entry = store.get(flows.get(provider))
+        if entry and time.time() - entry[2] < _FLOW_TTL_SEC:
+            return entry[1]
+
+        _prune_flows(store)
+        flow_key = secrets.token_urlsafe(16)
+        client = create_auth_client()
+        res = client.auth.sign_in_with_oauth(
             {
                 "provider": provider,
-                "options": {"redirect_to": _get_redirect_url()},
+                "options": {"redirect_to": _build_redirect_url(flow_key)},
             }
         )
+        store[flow_key] = (client, res.url, time.time())
+        flows[provider] = flow_key
+        st.session_state["oauth_flows"] = flows
         return res.url
     except Exception as e:
         st.error(f"{provider} 로그인 URL 생성 중 오류 발생: {e}")
         return None
 
 
-def handle_oauth_callback(supabase: Client | None = None):
-    query_params = st.query_params
+def handle_oauth_callback() -> None:
+    if st.session_state.get("user") is not None:
+        return
 
-    if "code" in query_params and st.session_state.get("user") is None:
-        auth_code = query_params["code"]
+    params = st.query_params
+    code = params.get("code")
+    flow_key = params.get("flow")
+    error = params.get("error_description") or params.get("error")
 
-        try:
-            # GitHub OAuth 인증 코드 교환
-            res = supabase.auth.exchange_code_for_session(
-                {"auth_code": auth_code}
-            )
-            user = res.user
+    if not code and not error:
+        return
 
-            if user is None:
-                st.error("OAuth 사용자 정보를 가져오지 못했습니다.")
-                return
+    # code는 일회용이다. rerun 때마다 재제출되지 않도록 URL에서 먼저 지운다.
+    st.query_params.clear()
 
-            # 데이터베이스 전용 클라이언트로 사용자 정보 저장
-            admin_supabase = get_supabase_admin_client()
+    if error:
+        st.error(f"소셜 로그인 실패: {error}")
+        return
 
-            metadata = getattr(user, "user_metadata", {}) or {}
+    entry = _flow_store().pop(flow_key, None) if flow_key else None
+    if not entry or time.time() - entry[2] > _FLOW_TTL_SEC:
+        st.error(
+            "로그인 흐름 정보를 찾지 못했습니다."
+            "또는 Supabase가 redirect URL의 flow 파라미터를 전달하지 않음) "
+            "다시 시도해 주세요. 계속되면 Supabase > Authentication > URL Configuration > "
+            "Redirect URLs에 이 앱 주소(끝에 /** 포함)가 등록되어 있는지 확인하세요."
+        )
+        return
+    client = entry[0]
 
-            username = (
-                metadata.get("user_name")
-                or metadata.get("preferred_username")
-                or metadata.get("full_name")
-                or metadata.get("name")
-                or getattr(user, "email", None)
-                or str(user.id)
-            )
+    # 1) code -> session 교환 (verifier는 이 client가 기억하고 있다)
+    try:
+        res = client.auth.exchange_code_for_session({"auth_code": code})
+    except Exception as e:
+        st.error(f"OAuth 코드 교환 실패: {e}")
+        return
 
-            admin_supabase.table("users").upsert(
-                {
-                    "id": str(user.id),
-                    "username": username,
-                },
-                on_conflict="id",
-            ).execute()
+    if res.user is None:
+        st.error("OAuth 사용자 정보를 가져오지 못했습니다.")
+        return
 
-            # 로그인 상태 저장
-            st.session_state.user = user
-            st.session_state.user_id = str(user.id)
-            st.session_state.logged_in = True
-            st.session_state.current_menu = "홈"
+    # 2) public.users 저장 + 로그인 상태 설정 (교환 실패와 저장 실패를 구분해서 표시)
+    try:
+        _save_auth_user(res.user)
+    except Exception as e:
+        st.error(f"사용자 정보 저장 실패 (public.users 테이블/제약조건 확인): {e}")
+        return
 
-            # OAuth 인증 코드 제거 후 화면 갱신
-            st.query_params.clear()
-            st.rerun()
-
-        except Exception as e:
-            st.error(f"OAuth 로그인 또는 사용자 정보 저장 실패: {e}")
-
+    st.rerun()
 
 
 # 로그아웃
-def logout_user(supabase: Client) -> None:
-    try:
-        supabase.auth.sign_out()
-
-    except Exception as e:
-        st.warning(f"로그아웃 중 알림: {e}")
-
-    finally:
-        st.session_state.user = None
-        st.session_state.user_id = None
-        st.session_state.logged_in = False
-        st.session_state.current_menu = "홈"
-
-        st.rerun()
+def logout_user() -> None:
+    # 로그인 상태는 이 브라우저 세션(st.session_state)에만 있다.
+    st.session_state.user = None
+    st.session_state.user_id = None
+    st.session_state.logged_in = False
+    st.session_state.current_menu = "홈"
+    st.session_state.pop("oauth_flows", None)
+    st.rerun()
 
 
 # 로그인 유저 정보 불러오기
@@ -157,7 +185,7 @@ def _save_auth_user(user, username: str | None = None) -> None:
 # 이메일로 로그인
 def login_with_email(email: str, password: str) -> bool:
     try:
-        supabase = get_supabase_client()
+        supabase = create_auth_client()
 
         res = supabase.auth.sign_in_with_password(
             {
@@ -187,7 +215,7 @@ def signup_with_email(
     username: str,
 ) -> bool:
     try:
-        supabase = get_supabase_client()
+        supabase = create_auth_client()
         res = supabase.auth.sign_up(
             {
                 "email": email.strip(),

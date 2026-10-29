@@ -129,3 +129,38 @@ def get_supabase_admin_client() -> Client:
         raise DatabaseConfigurationError(
             f"Supabase 관리 클라이언트 생성 실패: {exc}"
         ) from exc
+
+
+# ---------------------------------------------------------------------------
+# 로그인 전용 헬퍼
+# ---------------------------------------------------------------------------
+def _get_secret(name: str) -> Optional[str]:
+    """st.secrets[supabase] 섹션 -> st.secrets 최상위 -> 환경변수 순서로 조회."""
+    try:
+        section = st.secrets.get("supabase")
+        if section and section.get(name):
+            return section.get(name)
+        if st.secrets.get(name):
+            return st.secrets.get(name)
+    except Exception:
+        pass
+    return os.getenv(name)
+
+
+def get_supabase_url() -> str:
+    url = _get_secret("SUPABASE_URL")
+    if not url:
+        raise DatabaseConfigurationError("SUPABASE_URL이 설정되지 않았습니다.")
+    return url.rstrip("/")
+
+# 로그인/회원가입 클라이언트 생성
+def create_auth_client() -> Client:
+    key = _get_secret("SUPABASE_ANON_KEY") or _get_secret("SUPABASE_KEY")
+    if not key:
+        raise DatabaseConfigurationError(
+            "SUPABASE_ANON_KEY가 설정되지 않았습니다. .streamlit/secrets.toml을 확인해 주세요."
+        )
+    try:
+        return create_client(get_supabase_url(), key)
+    except Exception as exc:
+        raise DatabaseConfigurationError(f"Supabase 인증 클라이언트 생성 실패: {exc}") from exc

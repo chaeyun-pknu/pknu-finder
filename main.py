@@ -13,7 +13,6 @@ from database import (
     DatabaseOperationError,
     get_username,
     init_db,
-    get_supabase_client,
 )
 
 from views.mypage.auth import (
@@ -58,9 +57,8 @@ def render_auth_page() -> None:
     st.caption("부경대학교 분실물·습득물 찾기 서비스")
 
     #Github, Google 로그인 URL 가져오기
-    supabase = get_supabase_client()
-    github_url = get_oauth_login_url(supabase, "github")
-    google_url = get_oauth_login_url(supabase, "google")
+    github_url = get_oauth_login_url("github")
+    google_url = get_oauth_login_url("google")
 
     # 소셜 로그인 랜더링
     render_social_login_buttons(
@@ -74,23 +72,17 @@ def render_auth_page() -> None:
     st.markdown("---")
 
 def logout() -> None:
-    supabase = get_supabase_client()
-    logout_user(supabase)
-
-    st.session_state.logged_in = False
-    st.session_state.user_id = None
-    st.sessinon_state.user = None
-    st.session_state.current_menu = "홈"
-    
     for key in (
-        "login_username",
-        "login_password",
-        "signup_username",
-        "signup_password",
-        "signup_password_confirm",
+        "email_login_email",
+        "email_login_password",
+        "email_signup_username",
+        "email_signup_email",
+        "email_signup_password",
+        "email_signup_password_confirm",
     ):
         st.session_state.pop(key, None)
-    st.rerun()
+
+    logout_user()  # 세션 상태 초기화 후 st.rerun()
 
 # 랜더링 함수들을 각 메뉴에 맞게 구현 후 주석 제거 바람
 def render_selected_page(menu: str) -> None:
@@ -155,11 +147,18 @@ def render_app() -> None:
     render_selected_page(selected_menu)
 
 
+# DB 연결 확인은 10분에 한 번
+@st.cache_resource(ttl=600, show_spinner=False)
+def check_db_once() -> bool:
+    init_db()
+    return True
+
+
 # 메인 함수 오류 확인 등
 def main() -> None:
     initialize_session_state()
     try:
-        init_db()
+        check_db_once()
     except DatabaseConfigurationError as exc:
         st.error("Supabase 연결 설정이 필요합니다.")
         st.code(str(exc))
@@ -182,8 +181,7 @@ def main() -> None:
         st.stop()
 
     #OAuth 콜백 파라미터 체크 및 자동 로그인 세션 교환
-    supabase = get_supabase_client()
-    handle_oauth_callback(supabase)
+    handle_oauth_callback()
 
     # 로그인 여부 확인
     if st.session_state.get("user") is not None:
