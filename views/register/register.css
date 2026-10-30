@@ -1,0 +1,166 @@
+/* 전체 등록 카드 */
+.st-key-register_card {
+    background: #FFFFFF;
+    border: 1px solid #E5EAF3;
+    border-radius: 20px;
+    padding: 28px;
+    box-shadow: 0 8px 28px rgba(29,62,108,0.06);
+}
+
+/* 일반 입력창 */
+.st-key-register_page input:not([type="file"]),
+.st-key-register_page textarea {
+    background: #F8FAFD !important;
+    border: 1px solid #DFE6F0 !important;
+    border-radius: 11px !important;
+    color: #17243A !important;
+}
+
+.st-key-register_page input:focus,
+.st-key-register_page textarea:focus {
+    border-color: #2563EB !important;
+    box-shadow: 0 0 0 2px rgba(37,99,235,0.12) !important;
+}
+
+/* 입력 항목 라벨 */
+.register-label {
+    color: #334155;
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+/* 빨간색 필수 별표 */
+.register-required {
+    color: #EF4444;
+    font-size: 17px;
+    font-weight: 700;
+    margin-left: 4px;
+}
+
+/* 사진 업로드 구역 */
+.st-key-register_uploader
+[data-testid="stFileUploaderDropzone"] {
+    background: #F3F7FF;
+    border: 2px dashed #AFC8F0;
+    border-radius: 16px;
+    min-height: 190px;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.st-key-register_uploader
+[data-testid="stFileUploaderDropzone"]:hover {
+    border-color: #2563EB;
+    background: #EDF4FF;
+}
+
+.st-key-register_uploader
+[data-testid="stFileUploaderDropzone"] button {
+    background: #FFFFFF;
+    color: #2563EB;
+    border: 1px solid #BDD0EE;
+    border-radius: 9px;
+}
+
+/* 업로드 영역 전체 클릭 */
+.st-key-register_uploader
+[data-testid="stFileUploaderDropzone"] {
+    position: relative;
+}
+
+.st-key-register_uploader
+[data-testid="stFileUploaderDropzone"] input[type="file"] {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    opacity: 0 !important;
+    cursor: pointer !important;
+    z-index: 5 !important;
+}
+
+/* 사진 카드 */
+[class*="st-key-register_tile_"] {
+    position: relative !important;
+    border-radius: 12px;
+    background: #F1F5F9;
+    padding: 5px;
+}
+
+/* 정사각형 사진 */
+[class*="st-key-register_tile_"]
+[data-testid="stImage"] img {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    border-radius: 10px;
+    display: block;
+}
+
+/* 사진 오른쪽 상단 삭제 버튼 */
+[class*="st-key-register_tile_"]
+[class*="st-key-photo_delete_"] {
+    position: absolute !important;
+    top: 8px !important;
+    right: 8px !important;
+    z-index: 30 !important;
+    width: 30px !important;
+}
+
+[class*="st-key-register_tile_"]
+[class*="st-key-photo_delete_"] button {
+    width: 30px !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    padding: 0 !important;
+    background: rgba(15,23,42,0.85) !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 50% !important;
+    font-size: 19px !important;
+    font-weight: 700 !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+[class*="st-key-register_tile_"]
+[class*="st-key-photo_delete_"] button:hover {
+    background: #EF4444 !important;
+    color: #FFFFFF !important;
+}
+
+/* 태그 영역: 가로 배치, 간격 최소화 */
+.st-key-register_tags [data-testid="stHorizontalBlock"] {
+    gap: 6px !important;
+}
+
+.st-key-register_tags button {
+    width: auto !important;
+    min-height: 30px !important;
+    padding: 4px 10px !important;
+    border-radius: 100px !important;
+    background: #EFF6FF !important;
+    color: #2563EB !important;
+    border: 1px solid #D8E7FF !important;
+    font-size: 13px !important;
+    white-space: nowrap !important;
+}
+
+.st-key-register_tags button:hover {
+    background: #DBEAFE !important;
+    border-color: #93C5FD !important;
+}
+
+/* 등록 버튼 */
+.st-key-register_submit button {
+    background: #2563EB !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 12px !important;
+    min-height: 52px !important;
+    font-weight: 700 !important;
+}
+
+.st-key-register_submit button:hover {
+    background: #1D4ED8 !important;
+}
