@@ -1,4 +1,3 @@
-
 import streamlit as st
 
 from database import (
@@ -9,8 +8,14 @@ from database import (
 )
 
 from views.home.home import render_home
-from views.register.register import render_register
+
+from views.register.register import (
+    render_register,
+    clear_register_state,
+)
+
 from views.mypage.social_button import render_social_login_buttons
+
 from views.mypage.auth import (
     get_oauth_login_url,
     handle_oauth_callback,
@@ -19,12 +24,18 @@ from views.mypage.auth import (
     render_email_auth_form,
 )
 
+
 st.set_page_config(
     page_title="PKNU Finder",
     page_icon="🔎",
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+
+# ==========================================
+# 메뉴
+# ==========================================
 
 MENU_OPTIONS = [
     "홈",
@@ -69,6 +80,7 @@ def render_auth_page() -> None:
     )
 
     render_email_auth_form()
+
     st.markdown("---")
 
 
@@ -77,6 +89,11 @@ def render_auth_page() -> None:
 # ==========================================
 
 def logout() -> None:
+
+    # 등록 화면의 임시 입력값 삭제
+    clear_register_state()
+
+    # 로그인/회원가입 입력값 초기화
     for key in (
         "email_login_email",
         "email_login_password",
@@ -95,6 +112,7 @@ def logout() -> None:
 # ==========================================
 
 def render_selected_page(menu: str) -> None:
+
     if menu == "홈":
         render_home()
 
@@ -122,6 +140,7 @@ def render_selected_page(menu: str) -> None:
 # ==========================================
 
 def render_app() -> None:
+
     st.sidebar.title("PKNU Finder")
     st.sidebar.markdown("---")
 
@@ -142,9 +161,20 @@ def render_app() -> None:
     )
 
     st.session_state.current_menu = selected_menu
+
+    # ======================================
+    # 등록 화면을 벗어나면 입력값 초기화
+    # ======================================
+
+    if selected_menu != "분실물/습득물 등록":
+        clear_register_state()
+
     st.sidebar.markdown("---")
 
-    # 로그인 사용자 정보 표시
+    # ======================================
+    # 로그인 사용자 정보
+    # ======================================
+
     profile = get_current_user_profile()
     username = None
 
@@ -165,12 +195,14 @@ def render_app() -> None:
         else "접속 계정"
     )
 
+    # 로그아웃 버튼
     if st.sidebar.button(
         "로그아웃",
         use_container_width=True,
     ):
         logout()
 
+    # 선택한 메뉴 화면 실행
     render_selected_page(selected_menu)
 
 
@@ -189,35 +221,43 @@ def check_db_once() -> bool:
 # ==========================================
 
 def main() -> None:
+
     initialize_session_state()
 
+    # Supabase 연결 확인
     try:
         check_db_once()
 
     except DatabaseConfigurationError as exc:
         st.error("Supabase 연결 설정이 필요합니다.")
         st.code(str(exc))
+
         st.info(
             ".streamlit/secrets.toml의 "
             "Supabase 설정을 확인해주세요."
         )
+
         st.stop()
 
     except DatabaseOperationError as exc:
         st.error(
             "Supabase 데이터베이스를 확인하지 못했습니다."
         )
+
         st.code(str(exc))
+
         st.info(
             "Supabase 테이블 이름 및 "
             "접근 권한을 확인해주세요."
         )
+
         st.stop()
 
     except Exception as exc:
         st.error(
             "Supabase 초기화 중 오류가 발생했습니다."
         )
+
         st.code(str(exc))
         st.stop()
 
@@ -227,7 +267,7 @@ def main() -> None:
     if st.session_state.get("user") is not None:
         st.session_state.logged_in = True
 
-    # 로그인 상태에 따라 화면 표시
+    # 로그인 여부에 따른 화면 표시
     if st.session_state.logged_in:
         render_app()
     else:

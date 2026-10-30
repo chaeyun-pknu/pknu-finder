@@ -1,4 +1,5 @@
 import streamlit as st
+from pathlib import Path
 from datetime import date
 from uuid import uuid4
 
@@ -55,7 +56,27 @@ def remove_photo(photo_id):
 
 
 # ==========================================
-# 3. 등록 화면
+# 3. 등록 화면 상태 초기화 함수
+# ==========================================
+
+def clear_register_state():
+
+    # 등록 화면에서 사용한 세션 상태만 삭제
+    keys = [
+        key
+        for key in list(st.session_state.keys())
+        if key.startswith("register_")
+        or key.startswith("delete_photo_")
+        or key.startswith("photo_delete_")
+        or key.startswith("tag_remove_")
+    ]
+
+    for key in keys:
+        del st.session_state[key]
+
+
+# ==========================================
+# 4. 등록 화면
 # ==========================================
 
 def render_register():
@@ -71,181 +92,15 @@ def render_register():
         st.session_state.register_picker_version = 0
 
     # ======================================
-    # CSS 디자인
+    # CSS 디자인 파일 불러오기
     # ======================================
 
-    st.markdown("""
-    <style>
+    css_path = Path(__file__).with_name("register.css")
 
-    /* 전체 등록 카드 */
-    .st-key-register_card {
-        background: #FFFFFF;
-        border: 1px solid #E5EAF3;
-        border-radius: 20px;
-        padding: 28px;
-        box-shadow: 0 8px 28px rgba(29,62,108,0.06);
-    }
-
-    /* 일반 입력창 */
-    .st-key-register_page input:not([type="file"]),
-    .st-key-register_page textarea {
-        background: #F8FAFD !important;
-        border: 1px solid #DFE6F0 !important;
-        border-radius: 11px !important;
-        color: #17243A !important;
-    }
-
-    .st-key-register_page input:focus,
-    .st-key-register_page textarea:focus {
-        border-color: #2563EB !important;
-        box-shadow: 0 0 0 2px rgba(37,99,235,0.12) !important;
-    }
-
-    /* 입력 항목 라벨 */
-    .register-label {
-        color: #334155;
-        font-size: 15px;
-        font-weight: 600;
-        margin-bottom: 8px;
-    }
-
-    /* 빨간색 필수 별표 */
-    .register-required {
-        color: #EF4444;
-        font-size: 17px;
-        font-weight: 700;
-        margin-left: 4px;
-    }
-
-    /* 사진 업로드 구역 */
-    .st-key-register_uploader
-    [data-testid="stFileUploaderDropzone"] {
-        background: #F3F7FF;
-        border: 2px dashed #AFC8F0;
-        border-radius: 16px;
-        min-height: 190px;
-        cursor: pointer;
-        transition: 0.2s ease;
-    }
-
-    .st-key-register_uploader
-    [data-testid="stFileUploaderDropzone"]:hover {
-        border-color: #2563EB;
-        background: #EDF4FF;
-    }
-
-    .st-key-register_uploader
-    [data-testid="stFileUploaderDropzone"] button {
-        background: #FFFFFF;
-        color: #2563EB;
-        border: 1px solid #BDD0EE;
-        border-radius: 9px;
-    }
-
-    /* 업로드 영역 전체 클릭 */
-    .st-key-register_uploader
-    [data-testid="stFileUploaderDropzone"] {
-        position: relative;
-    }
-
-    .st-key-register_uploader
-    [data-testid="stFileUploaderDropzone"] input[type="file"] {
-        position: absolute !important;
-        inset: 0 !important;
-        width: 100% !important;
-        height: 100% !important;
-        opacity: 0 !important;
-        cursor: pointer !important;
-        z-index: 5 !important;
-    }
-
-    /* 사진 카드 */
-    [class*="st-key-register_tile_"] {
-        position: relative !important;
-        border-radius: 12px;
-        background: #F1F5F9;
-        padding: 5px;
-    }
-
-    /* 정사각형 사진 */
-    [class*="st-key-register_tile_"]
-    [data-testid="stImage"] img {
-        width: 100%;
-        aspect-ratio: 1 / 1;
-        object-fit: cover;
-        border-radius: 10px;
-        display: block;
-    }
-
-    /* 사진 오른쪽 상단 삭제 버튼 */
-    [class*="st-key-register_tile_"]
-    [class*="st-key-photo_delete_"] {
-        position: absolute !important;
-        top: 8px !important;
-        right: 8px !important;
-        z-index: 30 !important;
-        width: 30px !important;
-    }
-
-    [class*="st-key-register_tile_"]
-    [class*="st-key-photo_delete_"] button {
-        width: 30px !important;
-        height: 30px !important;
-        min-height: 30px !important;
-        padding: 0 !important;
-        background: rgba(15,23,42,0.85) !important;
-        color: #FFFFFF !important;
-        border: none !important;
-        border-radius: 50% !important;
-        font-size: 19px !important;
-        font-weight: 700 !important;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-    }
-
-    [class*="st-key-register_tile_"]
-    [class*="st-key-photo_delete_"] button:hover {
-        background: #EF4444 !important;
-        color: #FFFFFF !important;
-    }
-
-    /* 태그 영역: 가로 배치, 간격 최소화 */
-    .st-key-register_tags [data-testid="stHorizontalBlock"] {
-        gap: 6px !important;
-    }
-
-    .st-key-register_tags button {
-        width: auto !important;
-        min-height: 30px !important;
-        padding: 4px 10px !important;
-        border-radius: 100px !important;
-        background: #EFF6FF !important;
-        color: #2563EB !important;
-        border: 1px solid #D8E7FF !important;
-        font-size: 13px !important;
-        white-space: nowrap !important;
-    }
-
-    .st-key-register_tags button:hover {
-        background: #DBEAFE !important;
-        border-color: #93C5FD !important;
-    }
-
-    /* 등록 버튼 */
-    .st-key-register_submit button {
-        background: #2563EB !important;
-        color: #FFFFFF !important;
-        border: none !important;
-        border-radius: 12px !important;
-        min-height: 52px !important;
-        font-weight: 700 !important;
-    }
-
-    .st-key-register_submit button:hover {
-        background: #1D4ED8 !important;
-    }
-
-    </style>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        f"<style>{css_path.read_text(encoding='utf-8')}</style>",
+        unsafe_allow_html=True
+    )
 
     # ======================================
     # 페이지 시작
@@ -255,6 +110,7 @@ def render_register():
 
         st.markdown("**:blue[PKNU FINDER]**")
         st.title("분실물 · 습득물 등록")
+
         st.caption(
             "잃어버렸거나 발견한 물건의 정보를 등록해 주세요."
         )
@@ -348,6 +204,7 @@ def render_register():
 
             with info_col:
 
+                # 게시글 제목
                 st.markdown(
                     '<div class="register-label">'
                     '게시글 제목'
@@ -363,6 +220,7 @@ def render_register():
                     key="register_title"
                 )
 
+                # 등록 유형
                 st.markdown(
                     '<div class="register-label">'
                     '등록 유형'
@@ -378,6 +236,7 @@ def render_register():
                     key="register_type"
                 )
 
+                # 분실 / 습득 장소
                 st.markdown(
                     '<div class="register-label">'
                     '분실 / 습득 장소'
@@ -393,6 +252,7 @@ def render_register():
                     key="register_location"
                 )
 
+                # 분실 / 습득 날짜
                 st.markdown(
                     '<div class="register-label">'
                     '분실 / 습득 날짜'
@@ -416,7 +276,10 @@ def render_register():
             # ==============================
 
             st.markdown("#### 관련 태그")
-            st.caption("단어를 입력하고 Enter를 누르면 추가됩니다.")
+
+            st.caption(
+                "단어를 입력하고 Enter를 누르면 추가됩니다."
+            )
 
             st.text_input(
                 "태그 입력",
@@ -511,8 +374,10 @@ def render_register():
                     )
 
                 else:
-                    st.success("입력 내용 확인 완료!")
+                    st.success(
+                        "입력 내용 확인 완료!"
+                    )
 
                     st.info(
-                        "현재는 등록 UI 테스트 단계입니다. "
+                        "현재는 등록 UI 테스트 단계입니다."
                     )
