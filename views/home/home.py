@@ -1,5 +1,4 @@
 import streamlit as st
-from database import get_connection
 # from views.register/search.register/search import show_recent_items #최근 게시글 불러오기 함수
 
 def render_home() -> None:
