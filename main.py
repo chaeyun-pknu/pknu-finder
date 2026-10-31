@@ -1,6 +1,6 @@
 import streamlit as st
 
-from database import (
+from DB.database import (
     DatabaseConfigurationError,
     DatabaseOperationError,
     get_username,
@@ -13,6 +13,9 @@ from views.register.register import (
     render_register,
     clear_register_state,
 )
+#from views.search.search import render_search
+#from views.chat.chat import render_chat
+#from views.mypage.mypage import render_mypage
 
 # 로그인 및 회원가입
 from views.mypage.social_button import render_social_login_buttons
@@ -27,7 +30,7 @@ from views.mypage.auth import (
 
 st.set_page_config(
     page_title="PKNU Finder",
-    page_icon="🔎",
+    page_icon="docs/images/pknufinder_logo.png",
     layout="wide",
     initial_sidebar_state="expanded",
 )

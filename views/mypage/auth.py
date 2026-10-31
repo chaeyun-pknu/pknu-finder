@@ -3,7 +3,7 @@ import time
 
 import streamlit as st
 
-from database import create_auth_client, get_supabase_admin_client
+from DB.database import create_auth_client, get_supabase_admin_client
 
 
 # OAuth 인증 후 리다이렉트 주소 설정
