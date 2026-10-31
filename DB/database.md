@@ -575,7 +575,7 @@ pip install -r requirements.txt
 `database.py`에 정의된 `get_supabase_client()` 함수를 사용하여 연결을 확인할 수 있습니다.
 
 ```python
-from database import get_supabase_client
+from DB.database import get_supabase_client
 
 supabase = get_supabase_client()
 
