@@ -15,7 +15,7 @@ from views.register.register import (
 )
 #from views.search.search import render_search
 #from views.chat.chat import render_chat
-#from views.mypage.mypage import render_mypage
+from views.mypage.mypage import render_mypage
 
 # 로그인 및 회원가입
 from views.mypage.social_button import render_social_login_buttons
@@ -124,8 +124,7 @@ def render_selected_page(menu: str) -> None:
         render_home()
 
     elif menu == "마이페이지":
-        st.title("마이페이지")
-        st.info("마이페이지는 준비 중입니다.")
+        render_mypage()
 
     elif menu == "분실물/습득물 검색":
         st.title("분실물/습득물 검색")
