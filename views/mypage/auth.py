@@ -200,9 +200,8 @@ def logout_user() -> None:
     st.session_state.pop("oauth_flows", None)
     st.rerun()
 
-
+# 이메일 로그인 처리
 def login_with_email(email: str, password: str) -> bool:
-    """이메일과 비밀번호로 로그인합니다."""
     try:
         supabase = create_auth_client()
         response = supabase.auth.sign_in_with_password(
@@ -213,14 +212,14 @@ def login_with_email(email: str, password: str) -> bool:
         )
 
         if not response.user:
-            st.error("사용자 정보를 가져오지 못했습니다.")
+            st.toast("사용자 정보를 가져오지 못했습니다.", icon="❌", duration="short")
             return False
 
         _save_auth_user(response.user)
         return True
 
     except Exception:
-        st.error("로그인에 실패했습니다. 이메일과 비밀번호를 확인해 주세요.")
+        st.toast("로그인에 실패했습니다. 이메일과 비밀번호를 확인해 주세요.", icon="❌", duration="short")
         return False
 
 # =======================
@@ -262,15 +261,13 @@ def validate_signup_inputs(
     nickname = nickname.strip()
 
     if not email:
-        errors.append("이메일을 입력해주세요.")
+        st.toast("이메일을 입력해주세요.", icon="❌", duration="short")
 
     if not nickname:
-        errors.append("닉네임을 입력해주세요.")
+        st.toast("닉네임을 입력해주세요.", icon="❌", duration="short")
 
     if not validate_password(password):
-        errors.append(
-            "비밀번호는 영문과 숫자를 포함하여 6자리 이상이어야 합니다."
-        )
+        st.toast("비밀번호는 영문과 숫자를 포함하여 6자리 이상이어야 합니다.", icon="❌", duration="short")
 
     if password != password_confirm:
         errors.append("비밀번호가 일치하지 않습니다.")
@@ -278,7 +275,7 @@ def validate_signup_inputs(
     if nickname:
         try:
             if not is_nickname_available(nickname):
-                errors.append("이미 사용 중인 닉네임입니다.")
+                st.toast("이미 사용 중인 닉네임입니다.", icon="❌", duration="short")
         except Exception:
             errors.append("닉네임 중복 여부를 확인하지 못했습니다. 잠시 후 다시 시도해주세요.")
 
@@ -287,23 +284,23 @@ def validate_signup_inputs(
 
 # 회원가입 오류 메시지 처리
 def _signup_error_message(error: Exception) -> str:
-    message = str(error).lower()
+        message = str(error).lower()
 
-    if any(
-        marker in message
-        for marker in (
-            "already registered",
-            "email_exists",
-            "user_already_exists",
-            "already been registered",
+        if any(
+            marker in message
+            for marker in (
+                "already registered",
+                "email_exists",
+                "user_already_exists",
+                "already been registered",
+            )
+        ):
+            return "이미 가입된 이메일입니다."
+
+        return (
+            "회원가입에 실패했습니다. 이메일 형식과 비밀번호를 확인해 주세요. "
+            f"(오류: {error})"
         )
-    ):
-        return "이미 가입된 이메일입니다."
-
-    return (
-        "회원가입에 실패했습니다. 이메일 형식과 비밀번호를 확인해 주세요. "
-        f"(오류: {error})"
-    )
 
 # 이메일 회원가입 처리
 def signup_with_email(
@@ -314,6 +311,9 @@ def signup_with_email(
     try:
         supabase = create_auth_client()
         nickname = username.strip()
+        if not is_nickname_available(nickname):
+            st.toast("이미 사용 중인 닉네임입니다.", icon="❌")
+            return False
 
         response = supabase.auth.sign_up(
             {
@@ -449,7 +449,7 @@ def delete_user(user_id: str) -> None:
 
     # 사용자 프로필 탈퇴 유저로 변경
     supabase.table("users").update({
-        "username": "탈퇴한 유저",
+        "username": f"탈퇴한 유저_{str(user_id)[:8]}",
         "is_deleted": True,
         "deleted_at": datetime.now(timezone.utc).isoformat(),
     }).eq("id", user_id).execute()
