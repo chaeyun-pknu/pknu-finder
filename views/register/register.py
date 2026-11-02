@@ -1,7 +1,24 @@
+
 import streamlit as st
 from pathlib import Path
 from datetime import date
 from uuid import uuid4
+
+
+# ==========================================
+# 등록 화면에서 사용할 물품 카테고리
+# ==========================================
+
+ITEM_CATEGORIES = [
+    "선택해 주세요",
+    "전자기기",
+    "지갑·카드·신분증",
+    "가방·파우치",
+    "의류·액세서리",
+    "학용품·서적",
+    "생활용품·소지품",
+    "기타",
+]
 
 
 # ==========================================
@@ -233,7 +250,28 @@ def render_register():
                     "등록 유형",
                     ["선택해 주세요", "분실물", "습득물"],
                     label_visibility="collapsed",
-                    key="register_type"
+                    key="register_type",
+                    filter_mode=None
+                )
+
+                # ==============================
+                # 추가: 물품 카테고리 선택
+                # ==============================
+
+                st.markdown(
+                    '<div class="register-label">'
+                    '물품 카테고리'
+                    '<span class="register-required">*</span>'
+                    '</div>',
+                    unsafe_allow_html=True
+                )
+
+                category = st.selectbox(
+                    "물품 카테고리",
+                    ITEM_CATEGORIES,
+                    label_visibility="collapsed",
+                    key="register_category",
+                    filter_mode=None
                 )
 
                 # 분실 / 습득 장소
@@ -363,6 +401,12 @@ def render_register():
                         "등록 유형을 선택해 주세요."
                     )
 
+                # 추가: 카테고리 필수 선택 검사
+                elif category == "선택해 주세요":
+                    st.warning(
+                        "물품 카테고리를 선택해 주세요."
+                    )
+
                 elif not location.strip():
                     st.warning(
                         "장소를 입력해 주세요."
@@ -377,7 +421,7 @@ def render_register():
                     st.success(
                         "입력 내용 확인 완료!"
                     )
-
+                    
                     st.info(
                         "현재는 등록 UI 테스트 단계입니다."
                     )
