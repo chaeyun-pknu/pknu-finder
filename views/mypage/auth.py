@@ -1,6 +1,6 @@
 import secrets
 import time
-
+from datetime import datetime, timezone
 import streamlit as st
 
 from DB.database import create_auth_client, get_supabase_admin_client
@@ -316,24 +316,34 @@ def render_email_auth_form() -> None:
                 if signup_with_email(email, password, username):
                     st.rerun()
 
-"""
-# 회원 탈퇴
-def delete_user(user_id: int | str) -> bool:
-    if user_id is None or (isinstance(user_id, str) and not user_id.strip()):
-        raise ValueError("유효한 사용자 ID가 필요합니다.")
 
-    try:
-        response = (
-            get_supabase_client()
-            .table("users")
-            .delete()
-            .eq("id", user_id)
-            .execute()
-        )
-    except Exception as exc:
-        raise DatabaseOperationError(
-            "회원 탈퇴에 실패했습니다. Supabase 연결과 테이블 설정을 확인해주세요."
-        ) from exc
+# 회원 탈퇴 처리
+#1. 사용자 이름을 '탈퇴한 유저'로 변경
+#2. 탈퇴 여부와 탈퇴 일시 저장
+#3. 기존 북마크 삭제
+#4. Supabase Auth 계정 Soft Delete
+#게시글과 채팅 기록은 유지합니다.
 
-    return bool(response.data)
-    """
+def delete_user(user_id: str) -> None:
+    if not user_id:
+        raise ValueError("사용자 ID가 없습니다.")
+
+    supabase = get_supabase_admin_client()
+
+    # 사용자 프로필 탈퇴 유저로 변경
+    supabase.table("users").update({
+        "username": "탈퇴한 유저",
+        "is_deleted": True,
+        "deleted_at": datetime.now(timezone.utc).isoformat(),
+    }).eq("id", user_id).execute()
+
+    # 기존 북마크 삭제
+    supabase.table("bookmarks").delete().eq(
+        "user_id", user_id
+    ).execute()
+
+    # Supabase Auth 계정 Soft Delete
+    supabase.auth.admin.delete_user(
+        user_id,
+        should_soft_delete=True,
+    )
