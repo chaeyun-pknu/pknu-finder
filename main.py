@@ -13,6 +13,7 @@ from views.register.register import (
     render_register,
     clear_register_state,
 )
+from views.search.search import render_search
 
 # 로그인 및 회원가입
 from views.mypage.social_button import render_social_login_buttons
@@ -125,8 +126,7 @@ def render_selected_page(menu: str) -> None:
         st.info("마이페이지는 준비 중입니다.")
 
     elif menu == "분실물/습득물 검색":
-        st.title("분실물/습득물 검색")
-        st.info("검색 화면은 준비 중입니다.")
+        render_search()
 
     elif menu == "분실물/습득물 등록":
         render_register()
