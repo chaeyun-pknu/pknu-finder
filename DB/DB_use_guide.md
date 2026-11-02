@@ -108,7 +108,7 @@ pknu-finder/
 ├── DB/
 │   ├── database.py       # Supabase 연결 및 공통 함수
 │   ├── database.md       # 데이터베이스 생성 및 초기 설정
-│   └── guide.md          # Supabase 사용 가이드
+│   └── DB_use_guide.md   # Supabase 사용 가이드
 │
 ├── views/
 │   ├── register/         # 게시글 등록
@@ -278,10 +278,10 @@ users
 
 | id  | lost_item_id | image_path          |
 |:----|:-------------|:--------------------|
-| 1   | 1            | wallet/image1.jpg   |
-| 2   | 1            | wallet/image2.jpg   |
-| 3   | 1            | wallet/image3.jpg   |
-| 4   | 2            | umbrella/image1.jpg |
+| 1   | 1            | 1/a1b2c3.jpg        |
+| 2   | 1            | 1/d4e5f6.jpg        |
+| 3   | 1            | 1/0a9b8c.jpg        |
+| 4   | 2            | 2/7c6d5e.jpg        |
 
 `lost_item_images.lost_item_id`는 이미지가 어떤 게시글에 속하는지
 알려주는 값입니다.
@@ -335,9 +335,9 @@ PKNU Finder에서는 사용자가 게시글을 보고 게시글 작성자에게 
 각 컬럼의 의미는 다음과 같습니다.
 
 - `id`: 채팅 방의 고유 번호 (자동 생성)
-- `item_id`: 메시지와 관련된 게시글 ID
+- `item_id`: 채팅이 시작된 게시글 ID
 - `user1_id`: 해당 채팅방 내 유저1 ID
-- `user1_id`: 해당 채팅방 내 유저2 ID
+- `user2_id`: 해당 채팅방 내 유저2 ID
 
 
 위 예시를 해석하면 다음과 같습니다.
@@ -586,8 +586,12 @@ users
 - `id`는 자동으로 생성되므로 직접 입력하지 않습니다.
 - `user_id`는 게시글 작성자의 UUID입니다.
 - `created_at`은 기본값으로 현재 시간이 저장됩니다.
-- `status`의 기본값은 `습득`으로 설정되어 있습니다.
-- `lost_date`는 현재 TEXT 자료형이므로 날짜 문자열로 저장합니다.
+- `title`, `category`는 NOT NULL이므로 반드시 값을 넣어야 합니다.
+- `status`의 기본값은 `습득`으로 설정되어 있습니다. 현재 DB에는 허용값을
+  제한하는 제약이 없으므로, 팀에서 상태값(예: `분실`, `습득`)을 통일해
+  사용해야 합니다.
+- `lost_date`는 현재 TEXT 자료형이므로 날짜 문자열(`YYYY-MM-DD`)로 저장합니다.
+  Python의 `date` 객체는 `.isoformat()`으로 변환해서 넣습니다.
 
 ### ③ lost_item_images — 게시글 이미지 정보
 
@@ -647,7 +651,8 @@ users
 - `user1_id`, `user2_id`는 채팅방에 참여하는 두 사용자의 UUID입니다.
 - `user1_id`와 `user2_id`에는 서로 다른 사용자가 들어가야 합니다.
 - 같은 게시글과 같은 두 사용자 조합으로 채팅방이 중복 생성되지 않도록
-  고유 인덱스`id`가 설정되어 있습니다.
+  고유 인덱스가 설정되어 있습니다. `user1_id`와 `user2_id`의 순서가 바뀐
+  경우까지 막는지는 실제 인덱스 정의를 확인해야 합니다.
 - 한 채팅방에는 여러 메시지가 연결될 수 있습니다.
 
 ### ⑥ chats — 채팅 메시지 정보
@@ -783,10 +788,13 @@ response = (
     .execute()
 )
 
-item = response.data
+items = response.data                  # 결과는 항상 리스트입니다.
+item = items[0] if items else None     # 조회 결과가 없으면 None
 ```
 
-위 코드는 게시글 ID가 1인 데이터를 조회합니다.
+위 코드는 게시글 ID가 1인 데이터를 조회합니다. 결과가 리스트로 반환되므로
+첫 번째 요소를 꺼내 사용하며, 실제 코드에서는 `1` 대신 사용자가 선택한
+게시글의 ID를 넣습니다.
 
 ## 4-5. 데이터 수정하기 — UPDATE
 
@@ -835,6 +843,7 @@ response = (
 
 ``` python
 import streamlit as st
+from datetime import date
 from DB.database import get_supabase_client
 
 supabase = get_supabase_client()
@@ -845,22 +854,30 @@ if not user_id:
     st.warning("로그인이 필요합니다.")
     st.stop()
 
+item_date = date.today()  # 예: st.date_input()으로 받은 값
+
 item_data = {
-    "title": "검은색 지갑을 찾습니다.",
-    "description": "...",
-    ...
-    "user_id": user_id
+    "title": "검은색 지갑을 찾습니다.",       # NOT NULL
+    "description": "학생회관 근처에서 분실했습니다.",
+    "category": "지갑",                       # NOT NULL
+    "location": "학생회관",
+    "lost_date": item_date.isoformat(),       # TEXT 컬럼이므로 문자열로 변환
+    "status": "분실",                         # 값은 팀에서 통일 (3-3 참고)
+    "user_id": user_id,
 }
 
 response = (
     supabase
     .table("lost_items")
     .insert(item_data)
-    .select("*")
     .execute()
 )
 
-new_item = response.data[0]
+if not response.data:
+    st.error("게시글 등록 결과를 확인할 수 없습니다.")
+    st.stop()
+
+new_item = response.data[0]  # insert는 삽입된 행을 기본으로 반환합니다.
 
 st.success("게시글이 등록되었습니다.")
 st.write("등록된 게시글 ID:", new_item["id"])
@@ -869,8 +886,17 @@ st.write("등록된 게시글 ID:", new_item["id"])
 ### 중요한 부분
 
 - `user_id`는 현재 로그인한 사용자의 UUID입니다.
-- `id`는 게시글이 등록될 때 자동으로 생성되므로 직접 입력할 필요가 없습니다. 
-- `new_item` 변수는 새로 작성된 물품의 정보를 담아두는 변수입니다.
+- `id`는 게시글이 등록될 때 자동으로 생성되므로 직접 입력할 필요가 없습니다.
+- `title`, `category`는 NOT NULL이므로 빠뜨리면 오류가 발생합니다.
+- `lost_date`는 TEXT 컬럼입니다. `st.date_input()`이 반환하는 `date` 객체를
+  그대로 넣으면 JSON 변환 오류가 나므로 `.isoformat()`으로 문자열로 바꿉니다.
+- Python 클라이언트의 `insert()`는 별도의 `.select()` 없이도 삽입된 행을
+  `response.data`로 반환합니다. (`.insert(...).select(...)`는 JavaScript
+  클라이언트의 문법이며 Python에서는 사용할 수 없습니다.)
+- `new_item` 변수는 새로 작성된 게시글의 정보를 담아두는 변수입니다.
+- 현재 등록 화면(`views/register/register.py`)에는 `category` 입력과 태그를
+  저장하는 항목이 없습니다. 화면에서 받는 값과 DB 컬럼을 맞추는 작업이
+  필요합니다.
 
 ## 5-2. 게시글 목록 가져오기
 
@@ -979,6 +1005,54 @@ from DB.database import get_supabase_client
 
 supabase = get_supabase_client()
 
+
+def find_chat_room(item_id, user_a, user_b):
+    """같은 게시글에서 두 사용자가 참여한 채팅방을 찾습니다.
+    user1_id / user2_id 의 순서가 반대여도 같은 채팅방으로 찾습니다."""
+    response = (
+        supabase
+        .table("chat_rooms")
+        .select("*")
+        .eq("item_id", item_id)
+        .or_(
+            f"and(user1_id.eq.{user_a},user2_id.eq.{user_b}),"
+            f"and(user1_id.eq.{user_b},user2_id.eq.{user_a})"
+        )
+        .limit(1)
+        .execute()
+    )
+    return response.data[0] if response.data else None
+
+
+def get_or_create_chat_room(item_id, user_id, other_user_id):
+    # 1) 기존 채팅방이 있으면 그대로 사용합니다.
+    room = find_chat_room(item_id, user_id, other_user_id)
+    if room:
+        return room
+
+    # 2) 없으면 새로 생성합니다.
+    try:
+        response = (
+            supabase
+            .table("chat_rooms")
+            .insert({
+                "item_id": item_id,
+                "user1_id": user_id,
+                "user2_id": other_user_id,
+            })
+            .execute()
+        )
+        if response.data:
+            return response.data[0]
+    except Exception:
+        # 두 사용자가 거의 동시에 채팅을 시작하면 고유 인덱스 오류가
+        # 발생할 수 있습니다. 아래에서 기존 채팅방을 다시 조회합니다.
+        pass
+
+    # 3) 생성 중 오류가 났거나 반환값이 없으면 다시 조회합니다.
+    return find_chat_room(item_id, user_id, other_user_id)
+
+
 user_id = st.session_state.get("user_id")
 
 if not user_id:
@@ -993,38 +1067,11 @@ if user_id == other_user_id:
     st.warning("본인이 작성한 게시글에는 채팅을 시작할 수 없습니다.")
     st.stop()
 
-# 같은 게시글에서 두 사용자가 참여한 채팅방이 있는지 확인
-room_response = (
-    supabase
-    .table("chat_rooms")
-    .select("*")
-    .eq("item_id", item_id)
-    .or_(
-        f"and(user1_id.eq.{user_id},user2_id.eq.{other_user_id}),"
-        f"and(user1_id.eq.{other_user_id},user2_id.eq.{user_id})"
-    )
-    .limit(1)
-    .execute()
-)
+room = get_or_create_chat_room(item_id, user_id, other_user_id)
 
-if room_response.data:
-    # 기존 채팅방이 있으면 해당 채팅방을 사용합니다.
-    room = room_response.data[0]
-else:
-    # 기존 채팅방이 없으면 새로 생성합니다.
-    create_response = (
-        supabase
-        .table("chat_rooms")
-        .insert({
-            "item_id": item_id,
-            "user1_id": user_id,
-            "user2_id": other_user_id
-        })
-        .select("*")
-        .execute()
-    )
-
-    room = create_response.data[0]
+if not room:
+    st.error("채팅방을 만들 수 없습니다.")
+    st.stop()
 
 room_id = room["id"]
 
@@ -1041,7 +1088,8 @@ st.write("채팅방 ID:", room_id)
   않습니다.
 - DB에는 같은 게시글과 같은 두 사용자 조합의 중복 생성을 막는 고유
   인덱스가 있습니다. 동시에 두 요청이 들어오면 한 요청에서 중복 키
-  오류가 발생할 수 있습니다.
+  오류가 발생할 수 있으므로, 위 예제처럼 오류가 나면 기존 채팅방을
+  다시 조회합니다.
 
 ## 6-2. 채팅 메시지 등록하기
 
@@ -1064,23 +1112,30 @@ else:
     st.error("이 채팅방에 참여할 권한이 없습니다.")
     st.stop()
 
-message_text = "안녕하세요. 해당 물건을 확인하고 싶습니다."
+message_text = "안녕하세요. 해당 물건을 확인하고 싶습니다.".strip()
+
+if not message_text:
+    st.warning("메시지를 입력해 주세요.")
+    st.stop()
 
 chat_data = {
     "room_id": room["id"],
     "item_id": room["item_id"],
     "user_id": user_id,
     "receiver_id": receiver_id,
-    "message": message_text
+    "message": message_text,
 }
 
 response = (
     supabase
     .table("chats")
     .insert(chat_data)
-    .select("id")
     .execute()
 )
+
+if not response.data:
+    st.error("메시지 등록 결과를 확인할 수 없습니다.")
+    st.stop()
 
 st.success("메시지를 전송했습니다.")
 st.write("메시지 ID:", response.data[0]["id"])
@@ -1195,11 +1250,16 @@ for room in my_rooms:
 4.  **채팅방 참여자만 메시지를 조회하고 전송할 수 있어야 합니다.**
     - 화면에서 사용자 ID를 비교하는 것만으로는 보안이 보장되지 않습니다.
     - Supabase Auth 인증 정보와 RLS 정책을 이용해 데이터베이스에서도
-      권한을 검증해야 합니다.
+      권한을 검증하는 것이 이상적입니다.
+    - 현재는 서버 코드에서 `room["user1_id"]`, `room["user2_id"]`와
+      로그인한 `user_id`를 비교해 참여자를 확인합니다. (6-2 예제 참고)
 5.  **Service Role Key 사용에 주의합니다.**
     - Service Role Key를 사용하는 클라이언트는 RLS를 우회할 수 있습니다.
-    - 일반 사용자 요청에는 사용자 인증이 적용된 클라이언트를 사용해야
-      합니다.
+    - 일반 사용자 요청에는 사용자 인증이 적용된 클라이언트를 사용하는
+      것이 바람직합니다.
+    - 단, 현재 `DB/database.py`에는 사용자 인증이 적용된 클라이언트를
+      만드는 함수가 없고, 이 문서의 예제는 모두 `get_supabase_client()`를
+      사용합니다. 사용자 인증 클라이언트 도입은 추후 과제입니다.
 6.  **중복 채팅방 생성에 주의합니다.**
     - 같은 게시글과 같은 두 사용자의 채팅방은 기존 방을 재사용해야
       합니다.
@@ -1253,6 +1313,32 @@ else:
     st.info("이미 북마크한 게시글입니다.")
 ```
 
+**DB에서도 중복 방지하기 (권장)**
+
+위 코드는 앱에서 확인하는 방식이라 동시에 요청이 들어오면 중복이 생길 수
+있습니다. DB에 고유 제약을 추가하면 이를 막을 수 있습니다.
+
+먼저 SQL Editor에서 기존에 중복된 북마크가 있는지 확인합니다.
+
+``` sql
+SELECT user_id, item_id, COUNT(*)
+FROM public.bookmarks
+GROUP BY user_id, item_id
+HAVING COUNT(*) > 1;
+```
+
+결과가 0행이면 다음 SQL을 **한 번만** 실행합니다. (중복 데이터가 있으면 먼저
+정리해야 실행에 성공합니다.)
+
+``` sql
+ALTER TABLE public.bookmarks
+ADD CONSTRAINT bookmarks_user_item_unique
+UNIQUE (user_id, item_id);
+```
+
+제약을 추가한 뒤에는 중복 INSERT 시 오류가 발생하므로 `try/except`로
+처리하거나 위의 사전 확인 코드를 함께 사용합니다.
+
 ## 7-3. 내가 북마크한 게시글 가져오기
 
 먼저 내가 저장한 북마크 목록을 가져옵니다.
@@ -1295,53 +1381,76 @@ else:
 
 PKNU Finder에서는 이미지 파일과 이미지 정보를 별도로 관리합니다.
 
-<box border radius="lg" padding={3} gap={2}>
-<box background="rgba(59,130,246,0.10)" radius="md" padding={3} align="center">
-**Supabase Storage**
+| 저장 위치 | 저장하는 것 | 예시 |
+|:--|:--|:--|
+| Supabase Storage (`lost-item-images`) | 실제 이미지 파일 | `1/a1b2c3.jpg` |
+| `lost_item_images` 테이블 | 이미지 파일의 경로, 게시글 연결 정보 | `lost_item_id = 1` |
 
-    <text size="sm" color="secondary">실제 이미지 파일 저장</text>
-    <badge>1/image_a.jpg</badge>
-
-</box> <box align="center">
-<icon name="arrow-down-up" color="secondary"/> </box>
-<box background="rgba(16,185,129,0.10)" radius="md" padding={3} align="center">
-**lost_item_images**
-
-    <text size="sm" color="secondary">이미지 파일의 경로 저장</text>
-    <badge>lost_item_id = 1</badge>
-
-</box> <text size="sm" color="secondary">파일은 Storage에, 파일의 위치와
-게시글 연결 정보는 Database에 저장합니다.</text> </box>
+파일은 Storage에, 파일의 위치와 게시글 연결 정보는 Database에 저장합니다.
 
 ## 8-1. 이미지 업로드하기
 
-이미지 파일을 `lost-item-images` Bucket에 업로드합니다.
+이미지 파일을 `lost-item-images` Bucket에 업로드하고, 파일 경로를
+`lost_item_images` 테이블에 저장합니다.
+
+등록 화면(`views/register/register.py`)은 선택한 사진을
+`{"name": 파일명, "bytes": 파일 내용}` 형태로
+`st.session_state.register_photos`에 보관합니다.
 
 ``` python
 import uuid
+from pathlib import Path
 
-def upload_item_image(item_id, image_file):
-    file_name = f"{uuid.uuid4()}.jpg"
-    image_path = f"{item_id}/{file_name}"
+MIME_TYPES = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+}
 
-    supabase.storage.from_("lost-item-images").upload(
+
+def upload_item_image(supabase, item_id, photo):
+    """photo: {"name": "wallet.png", "bytes": b"..."}"""
+    ext = Path(photo["name"]).suffix.lower()
+    if ext not in MIME_TYPES:
+        raise ValueError("지원하지 않는 이미지 형식입니다. (jpg, jpeg, png)")
+
+    image_path = f"{item_id}/{uuid.uuid4().hex}{ext}"
+    bucket = supabase.storage.from_("lost-item-images")
+
+    # 1) Storage에 파일 업로드
+    bucket.upload(
         path=image_path,
-        file=image_file.getvalue(),
-        file_options={
-            "content-type": "image/jpeg"
-        }
+        file=photo["bytes"],
+        file_options={"content-type": MIME_TYPES[ext]},
     )
 
-    supabase.table("lost_item_images").insert({
-        "lost_item_id": item_id,
-        "image_path": image_path
-    }).execute()
+    # 2) DB에 경로 저장
+    try:
+        supabase.table("lost_item_images").insert({
+            "lost_item_id": item_id,
+            "image_path": image_path,
+        }).execute()
+    except Exception:
+        # DB 저장에 실패하면 Storage에 남은 파일(고아 파일)을 삭제합니다.
+        bucket.remove([image_path])
+        raise
 
     return image_path
+
+
+# 사용 예시 (5-1에서 만든 new_item 사용)
+for photo in st.session_state.register_photos.values():
+    upload_item_image(supabase, new_item["id"], photo)
 ```
 
-실제 코드에서는 업로드 파일의 형식에 맞게 확장자와 MIME 타입을 설정해야
-합니다.
+**주의할 점**
+
+- `lost-item-images` Bucket이 존재해야 하고, 업로드·삭제 권한이 설정되어
+  있어야 합니다.
+- 위 코드는 확장자만 검사합니다. 운영 환경에서는 파일 크기와 실제 이미지
+  형식도 함께 검사하는 것이 좋습니다.
+- Storage 업로드는 성공했는데 DB 저장이 실패하면 파일만 남게 되므로, 위
+  예제처럼 실패 시 파일을 삭제합니다.
 
 ## 8-2. 이미지 경로 가져오기
 
@@ -1366,28 +1475,37 @@ image_paths = [
 합니다.
 
 ``` python
-def get_signed_image_url(image_path):
+def get_signed_image_url(supabase, image_path):
     response = (
         supabase.storage
         .from_("lost-item-images")
         .create_signed_url(image_path, 3600)
     )
 
-    return response["signedURL"]
+    # 라이브러리 버전에 따라 키 이름이 다를 수 있어 둘 다 확인합니다.
+    return response.get("signedURL") or response.get("signedUrl")
 ```
 
 Streamlit에서 표시하는 예시입니다.
 
 ``` python
 for image_path in image_paths:
-    image_url = get_signed_image_url(image_path)
-    st.image(image_url)
+    image_url = get_signed_image_url(supabase, image_path)
+
+    if image_url:
+        st.image(image_url)
+    else:
+        st.caption("이미지를 불러올 수 없습니다.")
 ```
 
-`3600`은 URL의 유효 시간이며 단위는 초입니다.
+`3600`은 URL의 유효 시간이며 단위는 초입니다. 반환되는 키 이름은 설치된
+`supabase` 라이브러리 버전에 따라 다를 수 있으므로, 사용 중인 버전에서 한 번
+확인해 보세요.
 
 **주의:** 게시글이 삭제되어도 Storage에 저장된 실제 이미지 파일은
-자동으로 삭제되지 않습니다. 
+자동으로 삭제되지 않습니다. 게시글 삭제 기능을 구현할 때는
+`storage.from_("lost-item-images").remove([...])`로 파일도 함께 삭제해야
+합니다.
 
 ------------------------------------------------------------------------
 
@@ -1426,7 +1544,8 @@ response = (
 )
 ```
 
-실제 서비스에서 사용하는 상태값에 맞춰 변경해야 합니다.
+`status` 값은 팀에서 정한 상태값에 맞춰야 합니다. 위의 `완료`는 예시이므로
+실제 사용하는 값으로 바꿔 주세요.
 
 ## 9-3. 북마크 삭제하기
 
@@ -1570,7 +1689,12 @@ RLS가 활성화되어 있다고 해서 모든 사용자가 데이터를 자유�
 - 일반 사용자 요청에는 사용자 인증과 권한 검증이 적용되는 구조를
   사용해야 합니다.
 
-자세한 연결 설정은 [database.md](DB/database.md)를 참고합니다.
+다만 현재 `DB/database.py`에는 사용자 인증이 적용된 클라이언트를 만드는
+함수가 없고, 이 문서의 모든 예제는 `get_supabase_client()`(서비스 키 우선)를
+사용합니다. 따라서 RLS가 아니라 서버 코드의 `.eq("user_id", user_id)` 같은
+소유자 검증이 현재 유일한 방어선이며, RLS 기반 검증은 추후 과제입니다.
+
+자세한 연결 설정은 [database.md](database.md)를 참고합니다.
 
 ------------------------------------------------------------------------
 
@@ -1580,7 +1704,7 @@ RLS가 활성화되어 있다고 해서 모든 사용자가 데이터를 자유�
 
 | 작업                | 사용할 테이블             | 핵심 컬럼                                                 |
 |:--------------------|:--------------------------|:----------------------------------------------------------|
-| 게시글 등록         | `lost_items`              | `title`, `description`, `user_id`                         |
+| 게시글 등록         | `lost_items`              | `title`, `category`, `description`, `user_id`            |
 | 게시글 검색         | `lost_items`              | `title`, `category`, `location`, `status`                 |
 | 내가 작성한 게시글  | `lost_items`              | `user_id`                                                 |
 | 이미지 등록         | `lost_item_images`        | `lost_item_id`, `image_path`                              |
@@ -1699,6 +1823,5 @@ Supabase를 사용할 때 가장 중요한 것은 각 테이블의 역할과 관
 기능을 구현하기 전에 이 가이드를 참고하고, 데이터베이스의 컬럼이나
 관계를 변경해야 한다면 팀원들과 먼저 공유해 주세요.
 
-**추가 참고 문서** - `database.md`: Supabase 가입, 프로젝트 생성, 테이블
-생성, 인증 및 환경 설정 - `guide.md`: 실제 Python 코드에서 데이터를
-입력하고 조회하는 방법
+**추가 참고 문서** - [database.md](database.md): Supabase 가입, 프로젝트 생성, 테이블
+생성, 인증 및 환경 설정 - [DB_use_guide.md](DB_use_guide.md): 실제 Python 코드에서 데이터를 입력하고 조회하는 방법
