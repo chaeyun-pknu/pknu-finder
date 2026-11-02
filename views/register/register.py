@@ -1,4 +1,4 @@
-
+from DB.database import get_supabase_client
 import streamlit as st
 from pathlib import Path
 from datetime import date
@@ -22,13 +22,131 @@ ITEM_CATEGORIES = [
 
 
 # ==========================================
+# Supabase 사진 저장 설정
+# ==========================================
+
+IMAGE_BUCKET = "lost-item-images"
+
+MIME_TYPES = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+}
+
+
+# ==========================================
+# Supabase Storage에 사진 업로드
+# ==========================================
+
+def upload_item_image(supabase, item_id, photo):
+    # 사진 확장자 확인
+    ext = Path(photo["name"]).suffix.lower()
+
+    if ext not in MIME_TYPES:
+        raise ValueError(
+            "지원하지 않는 이미지 형식입니다. (jpg, jpeg, png)"
+        )
+
+    # 파일별 고유 이름 생성
+    image_path = f"{item_id}/{uuid4().hex}{ext}"
+
+    bucket = supabase.storage.from_(IMAGE_BUCKET)
+
+    # 1. 실제 사진을 Storage에 업로드
+    bucket.upload(
+        path=image_path,
+        file=photo["bytes"],
+        file_options={
+            "content-type": MIME_TYPES[ext]
+        },
+    )
+
+    # 2. 업로드한 사진의 경로를 DB에 저장
+    try:
+        response = (
+            supabase.table("lost_item_images")
+            .insert({
+                "lost_item_id": item_id,
+                "image_path": image_path,
+            })
+            .execute()
+        )
+
+        if not response.data:
+            raise RuntimeError(
+                "사진 경로 저장 결과를 확인하지 못했습니다."
+            )
+
+    except Exception:
+        # 경로 저장 실패 시 Storage에 남은 사진 삭제
+        bucket.remove([image_path])
+        raise
+
+    return image_path
+
+
+# ==========================================
+# Supabase에 게시글 저장
+# ==========================================
+
+def save_register_item(
+    title,
+    item_type,
+    category,
+    location,
+    item_date,
+    description,
+    user_id,
+    tags
+):
+    supabase = get_supabase_client()
+
+    # 등록 유형을 DB 상태 값으로 변환
+    status = {
+        "분실물": "분실",
+        "습득물": "습득"
+    }[item_type]
+
+    item_data = {
+        "title": title.strip(),
+        "status": status,
+        "category": category,
+        "location": location.strip(),
+        "lost_date": item_date.isoformat(),
+        "description": description.strip(),
+        "user_id": str(user_id),
+        "tags": list(tags)
+    }
+
+    response = (
+        supabase.table("lost_items")
+        .insert(item_data)
+        .execute()
+    )
+
+    if not response.data:
+        raise RuntimeError(
+            "게시글 저장 결과를 확인하지 못했습니다."
+        )
+
+    return response.data[0]
+
+
+# ==========================================
 # 1. 태그 관리 함수
 # ==========================================
 
 def add_tag():
-    value = st.session_state.get(
-        "register_tag_input", ""
-    ).strip().lstrip("#").strip()
+    # 현재 등록 폼에 해당하는 태그 입력창을 읽습니다.
+    version = st.session_state.get("register_form_version", 0)
+    input_key = f"register_tag_input_{version}"
+
+    value = (
+        st.session_state.get(input_key, "")
+        .strip()
+        .lstrip("#")
+        .strip()
+    )
 
     if not value:
         return
@@ -38,7 +156,7 @@ def add_tag():
     if value not in tags and len(tags) < 10:
         tags.append(value)
 
-    st.session_state.register_tag_input = ""
+    st.session_state[input_key] = ""
 
 
 def remove_tag(tag):
@@ -77,19 +195,29 @@ def remove_photo(photo_id):
 # ==========================================
 
 def clear_register_state():
+    # 등록 폼에 새로운 key를 부여해
+    # 입력창을 완전히 새로 생성합니다.
+    st.session_state["register_form_version"] += 1
 
-    # 등록 화면에서 사용한 세션 상태만 삭제
-    keys = [
-        key
-        for key in list(st.session_state.keys())
-        if key.startswith("register_")
-        or key.startswith("delete_photo_")
-        or key.startswith("photo_delete_")
-        or key.startswith("tag_remove_")
-    ]
+    # 임시 사진, 태그 목록 초기화
+    st.session_state["register_tags"] = []
+    st.session_state["register_photos"] = {}
 
-    for key in keys:
-        del st.session_state[key]
+    # 사진 업로더를 새로 생성
+    st.session_state["register_picker_version"] += 1
+
+    # 이전 폼의 위젯 키 정리
+    # 로그인 등 다른 화면의 상태는 보존
+    keep = {
+        "register_form_version",
+        "register_tags",
+        "register_photos",
+        "register_picker_version",
+    }
+
+    for key in list(st.session_state.keys()):
+        if key.startswith("register_") and key not in keep:
+            del st.session_state[key]
 
 
 # ==========================================
@@ -97,6 +225,34 @@ def clear_register_state():
 # ==========================================
 
 def render_register():
+
+    # 폼 버전은 등록 초기화 때만 증가합니다.
+    if "register_form_version" not in st.session_state:
+        st.session_state.register_form_version = 0
+
+    if "register_picker_version" not in st.session_state:
+        st.session_state.register_picker_version = 0
+
+    # 입력 위젯을 만들기 전에 초기화
+    if st.session_state.pop(
+        "registration_reset_pending", False
+    ):
+        clear_register_state()
+
+    # 등록 완료 메시지 상태
+    registration_success = st.session_state.pop(
+        "registration_success", False
+    )
+
+    if registration_success:
+        st.toast(
+            "물품이 정상적으로 등록되었습니다!",
+            icon="✅",
+            duration="short"
+        )
+
+    # 현재 입력 폼 버전
+    form_version = st.session_state.register_form_version
 
     # 세션 상태 초기화
     if "register_tags" not in st.session_state:
@@ -207,6 +363,7 @@ def render_register():
                                 with st.container(
                                     key=f"photo_delete_{photo_id}"
                                 ):
+
                                     st.button(
                                         "×",
                                         key=f"delete_photo_{photo_id}",
@@ -234,7 +391,7 @@ def render_register():
                     "게시글 제목",
                     placeholder="예) 중앙도서관에서 지갑을 잃어버렸어요",
                     label_visibility="collapsed",
-                    key="register_title"
+                    key=f"register_title_{form_version}"
                 )
 
                 # 등록 유형
@@ -250,12 +407,12 @@ def render_register():
                     "등록 유형",
                     ["선택해 주세요", "분실물", "습득물"],
                     label_visibility="collapsed",
-                    key="register_type",
+                    key=f"register_type_{form_version}",
                     filter_mode=None
                 )
 
                 # ==============================
-                # 추가: 물품 카테고리 선택
+                # 물품 카테고리 선택
                 # ==============================
 
                 st.markdown(
@@ -270,7 +427,7 @@ def render_register():
                     "물품 카테고리",
                     ITEM_CATEGORIES,
                     label_visibility="collapsed",
-                    key="register_category",
+                    key=f"register_category_{form_version}",
                     filter_mode=None
                 )
 
@@ -287,7 +444,7 @@ def render_register():
                     "장소",
                     placeholder="예) 중앙도서관 2층",
                     label_visibility="collapsed",
-                    key="register_location"
+                    key=f"register_location_{form_version}"
                 )
 
                 # 분실 / 습득 날짜
@@ -304,7 +461,7 @@ def render_register():
                     value=date.today(),
                     max_value=date.today(),
                     label_visibility="collapsed",
-                    key="register_date"
+                    key=f"register_date_{form_version}"
                 )
 
             st.divider()
@@ -322,7 +479,7 @@ def render_register():
             st.text_input(
                 "태그 입력",
                 placeholder="예) 지갑",
-                key="register_tag_input",
+                key=f"register_tag_input_{form_version}",
                 on_change=add_tag,
                 label_visibility="collapsed"
             )
@@ -337,6 +494,7 @@ def render_register():
                     horizontal_alignment="left",
                     gap="small"
                 ):
+
                     for i, tag in enumerate(tags):
 
                         st.button(
@@ -368,7 +526,7 @@ def render_register():
                 ),
                 height=200,
                 label_visibility="collapsed",
-                key="register_description"
+                key=f"register_description_{form_version}"
             )
 
             st.write("")
@@ -401,7 +559,6 @@ def render_register():
                         "등록 유형을 선택해 주세요."
                     )
 
-                # 추가: 카테고리 필수 선택 검사
                 elif category == "선택해 주세요":
                     st.warning(
                         "물품 카테고리를 선택해 주세요."
@@ -418,10 +575,78 @@ def render_register():
                     )
 
                 else:
-                    st.success(
-                        "입력 내용 확인 완료!"
-                    )
-                    
-                    st.info(
-                        "현재는 등록 UI 테스트 단계입니다."
-                    )
+                    # 현재 로그인한 사용자 ID 확인
+                    user_id = st.session_state.get("user_id")
+
+                    if not user_id:
+                        st.error(
+                            "로그인 사용자 정보를 확인할 수 없습니다. "
+                            "다시 로그인해 주세요."
+                        )
+
+                    else:
+                        saved_item = None
+                        uploaded_paths = []
+
+                        try:
+                            # 1. 게시글 기본 정보 저장
+                            saved_item = save_register_item(
+                                title=title,
+                                item_type=item_type,
+                                category=category,
+                                location=location,
+                                item_date=item_date,
+                                description=description,
+                                user_id=user_id,
+                                tags=tags
+                            )
+
+                            item_id = saved_item["id"]
+
+                            # 2. Supabase 연결
+                            supabase = get_supabase_client()
+
+                            # 3. 첨부된 사진 저장
+                            photos_to_save = list(
+                                st.session_state.register_photos.values()
+                            )
+
+                            for photo in photos_to_save:
+
+                                image_path = upload_item_image(
+                                    supabase=supabase,
+                                    item_id=item_id,
+                                    photo=photo
+                                )
+
+                                uploaded_paths.append(image_path)
+
+                        except Exception as exc:
+
+                            st.error(
+                                "등록 처리 중 오류가 발생했습니다."
+                            )
+                            st.error(str(exc))
+
+                            if saved_item is not None:
+                                st.warning(
+                                    "게시글은 저장되었지만 사진 저장이 "
+                                    "완료되지 않았을 수 있습니다. "
+                                    f"게시글 ID: {saved_item['id']}. "
+                                    "중복 등록하지 말고 저장 상태를 "
+                                    "확인해 주세요."
+                                )
+
+                        else:
+                            # 등록 성공 상태 저장
+                            st.session_state[
+                                "registration_success"
+                            ] = True
+
+                            # 다음 실행에서 입력값 초기화
+                            st.session_state[
+                                "registration_reset_pending"
+                            ] = True
+
+                            # 화면 다시 실행
+                            st.rerun()
