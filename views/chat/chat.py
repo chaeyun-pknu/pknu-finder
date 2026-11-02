@@ -85,9 +85,9 @@ def render_chat_list():
     for room_id, room in rooms.items():
 
         if st.button(
-            f"📦 {room['item_title']}\n\n"
+            f"{room['item_title']}\n\n"
             f"{room['last_message']}\n\n"
-            f"🕒 {room['timestamp']}",
+            f"{room['timestamp']}",
             key=f"chat_room_{room_id}",
             use_container_width=True,
         ):
@@ -158,6 +158,7 @@ def render_chat_room(room_id):
         st.session_state.chat_messages.append(new_chat)
         st.rerun()
 
+#user_id랑 timestamp 임시구현 수정필요
 
 # ==========================================
 # 5. 채팅 메인 함수
