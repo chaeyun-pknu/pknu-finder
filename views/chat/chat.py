@@ -1,5 +1,6 @@
 import streamlit as st
 from pathlib import Path
+from html import escape
 
 # CSS 파일 경로
 CSS_PATH = Path(__file__).parent / "chat.css"
@@ -62,6 +63,7 @@ def init_chat_state():
 # 3. 채팅 목록 화면
 # ==========================================
 
+
 def render_chat_list():
     st.title("채팅")
     st.caption("분실물과 습득물에 관한 대화를 확인하세요.")
@@ -90,17 +92,30 @@ def render_chat_list():
         st.info("참여 중인 채팅방이 없습니다.")
         return
 
+    
+    # 채팅방 목록 표시
     for room_id, room in rooms.items():
 
+        # 버튼 내부에 표시할 내용
+        title = room["item_title"]
+        message = room["last_message"]
+        timestamp = room["timestamp"]
+
+        button_label = (
+            f"**{title}**\n\n"
+            f"{message}\n\n"
+            f"{timestamp}"
+        )
+
+        # 채팅방 전체가 하나의 버튼
         if st.button(
-            f"{room['item_title']}\n\n"
-            f"{room['last_message']}\n\n"
-            f"{room['timestamp']}",
+            button_label,
             key=f"chat_room_{room_id}",
             use_container_width=True,
         ):
             st.session_state.selected_room = room_id
             st.rerun()
+
 
 # ==========================================
 # 4. 채팅방 상세 화면
@@ -132,18 +147,23 @@ def render_chat_room(room_id):
     st.subheader(item_title)
     st.divider()
 
-    # 메시지 표시
+# 메시지 표시
     for chat in messages:
 
-        role = (
-            "user"
-            if chat["user_id"] == "me"
-            else "assistant"
-        )
+        is_me = chat["user_id"] == "me"
 
-        with st.chat_message(role):
-            st.write(chat["message"])
-            st.caption(chat["timestamp"])
+        if is_me:
+            # 내가 보낸 메시지: 오른쪽
+            with st.container(key=f"chat-msg-me-{chat['id']}"):
+                st.write(chat["message"])
+                st.caption(chat["timestamp"])
+
+        else:
+            # 상대방 메시지: 왼쪽
+            with st.container(key=f"chat-msg-other-{chat['id']}"):
+                st.write(chat["message"])
+                st.caption(chat["timestamp"])
+
 
     # 메시지 입력
     new_message = st.chat_input("메시지를 입력하세요.")
