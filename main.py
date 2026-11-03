@@ -166,6 +166,10 @@ def render_app() -> None:
         key="menu_radio",
     )
 
+    # 다른 메뉴에서 채팅 메뉴로 돌아오면 채팅 목록으로 초기화
+    if selected_menu == "채팅" and current_menu != "채팅":
+        st.session_state.selected_room = None
+
     st.session_state.current_menu = selected_menu
 
     # 등록 화면에서 다른 메뉴로 이동하면 입력값 초기화
