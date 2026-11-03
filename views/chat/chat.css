@@ -1,10 +1,128 @@
-/* 채팅방 버튼 텍스트 왼쪽 정렬 */
-.stButton > button {
+
+/* ==========================================
+    1. 채팅방 목록 버튼
+========================================== */
+
+/* 채팅방 버튼 */
+[class*="st-key-chat_room_"] button {
+    width: 100%;
+    justify-content: left;
+    text-align: left;
+    padding: 16px 20px;
+}
+
+/* 버튼 내부 텍스트 */
+[class*="st-key-chat_room_"] button [data-testid="stMarkdownContainer"] {
+    text-align: left;
+    margin: 0;
+}
+
+/* 채팅방 버튼에 마우스를 올렸을 때 */
+[class*="st-key-chat_room_"] button:hover {
+    background-color: #f8f9fa;
+    border-color: #bfc5cc;
+}
+
+/* 버튼 클릭 시 */
+[class*="st-key-chat_room_"] button:active {
+    background-color: #eef2f6;
+}
+
+/* 키보드로 선택했을 때 */
+[class*="st-key-chat_room_"] button:focus-visible {
+    outline: 2px solid #4a90e2;
+    outline-offset: 2px;
+}
+
+
+/* ==========================================
+    2. 채팅방 내부 메시지
+========================================== */
+
+/* 메시지 말풍선 공통 스타일 */
+[class*="st-key-chat-msg-"] {
+    width: fit-content;
+    max-width: 75%;
+
+    padding: 10px 14px;
+    margin-bottom: 12px;
+
+    border-radius: 12px;
+    overflow-wrap: anywhere;
+}
+
+/* 상대방 메시지 - 왼쪽 */
+[class*="st-key-chat-msg-other-"] {
+    margin-left: 0;
+    margin-right: auto;
+
+    background-color: #f1f3f5;
+    border-top-left-radius: 3px;
+}
+
+/* 내 메시지 - 오른쪽 */
+[class*="st-key-chat-msg-me-"] {
+    margin-left: auto;
+    margin-right: 0;
+
+    background-color: #dbeafe;
+    border-top-right-radius: 3px;
+}
+
+/* 메시지 내용 */
+[class*="st-key-chat-msg-"] p {
+    margin: 0;
+    text-align: left;
+    line-height: 1.5;
+}
+
+/* 메시지 작성 시간 */
+[class*="st-key-chat-msg-"] [data-testid="stCaptionContainer"] {
+    font-size: 11px;
+    color: #888888;
+    margin-top: 4px;
+}
+
+/* 내 메시지의 시간 - 오른쪽 정렬 */
+[class*="st-key-chat-msg-me-"] [data-testid="stCaptionContainer"] {
+    text-align: right;
+}
+
+/* 상대방 메시지의 시간 - 왼쪽 정렬 */
+[class*="st-key-chat-msg-other-"] [data-testid="stCaptionContainer"] {
     text-align: left;
 }
 
-/* 버튼 내부 텍스트 왼쪽 정렬 */
-.stButton > button p {
-    text-align: left;
-    width: 100%;
+
+/* ==========================================
+    3. 채팅 입력창
+========================================== */
+
+/* 채팅 입력창 모서리 */
+[data-testid="stChatInput"] {
+    border-radius: 12px;
+}
+
+/* 입력창 내부 글자 */
+[data-testid="stChatInput"] textarea {
+    font-size: 14px;
+}
+
+
+/* ==========================================
+    4. 모바일 화면 대응
+========================================== */
+
+@media (max-width: 768px) {
+
+    /* 채팅방 버튼 여백 */
+    [class*="st-key-chat_room_"] button {
+        padding: 12px 14px;
+        min-height: 75px;
+    }
+
+    /* 채팅 말풍선 최대 너비 */
+    [class*="st-key-chat-msg-"] {
+        max-width: 85%;
+    }
 }
