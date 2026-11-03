@@ -1,0 +1,10 @@
+/* 채팅방 버튼 텍스트 왼쪽 정렬 */
+.stButton > button {
+    text-align: left;
+}
+
+/* 버튼 내부 텍스트 왼쪽 정렬 */
+.stButton > button p {
+    text-align: left;
+    width: 100%;
+}
