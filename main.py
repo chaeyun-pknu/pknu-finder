@@ -27,6 +27,9 @@ from views.mypage.auth import (
     render_email_auth_form,
 )
 
+#채팅 화면
+from views.chat.chat import render_chat
+
 
 st.set_page_config(
     page_title="PKNU Finder",
@@ -133,8 +136,7 @@ def render_selected_page(menu: str) -> None:
         render_register()
 
     elif menu == "채팅":
-        st.title("채팅")
-        st.info("채팅 화면은 준비 중입니다.")
+        render_chat()
 
     else:
         st.warning("선택한 메뉴를 찾을 수 없습니다.")
@@ -164,6 +166,10 @@ def render_app() -> None:
         index=MENU_OPTIONS.index(current_menu),
         key="menu_radio",
     )
+
+    # 다른 메뉴에서 채팅 메뉴로 돌아오면 채팅 목록으로 초기화
+    if selected_menu == "채팅" and current_menu != "채팅":
+        st.session_state.selected_room = None
 
     st.session_state.current_menu = selected_menu
 
