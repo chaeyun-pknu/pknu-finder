@@ -144,25 +144,28 @@ def render_chat_room(room_id):
         st.session_state.selected_room = None
         st.rerun()
 
-    st.subheader(item_title)
+    st.subheader(f"{item_title}의 채팅방")
     st.divider()
 
-# 메시지 표시
+
+    # 메시지 표시
     for chat in messages:
 
         is_me = chat["user_id"] == "me"
 
-        if is_me:
-            # 내가 보낸 메시지: 오른쪽
-            with st.container(key=f"chat-msg-me-{chat['id']}"):
-                st.write(chat["message"])
-                st.caption(chat["timestamp"])
+        # 발신자에 따라 컨테이너 구분
+        role = "me" if is_me else "other"
 
-        else:
-            # 상대방 메시지: 왼쪽
-            with st.container(key=f"chat-msg-other-{chat['id']}"):
+        # 메시지와 시간을 묶는 전체 영역
+        with st.container(key=f"chat-msg-{role}-{chat['id']}"):
+
+            # 말풍선 영역
+            with st.container(key=f"bubble-{chat['id']}"):
                 st.write(chat["message"])
-                st.caption(chat["timestamp"])
+
+            # 말풍선 밖의 시간
+            st.caption(chat["timestamp"])
+
 
 
     # 메시지 입력

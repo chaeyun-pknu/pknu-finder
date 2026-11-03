@@ -3,23 +3,23 @@
     1. 채팅방 목록 버튼
 ========================================== */
 
-/* 채팅방 버튼 */
-[class*="st-key-chat_room_"] button {
+/* 버튼 내부 div 왼쪽 정렬 */
+[class*="st-key-chat_room_"] button > div {
     width: 100%;
-    justify-content: left;
+    justify-content: flex-start;
+    align-items: flex-start;
     text-align: left;
-    padding: 16px 20px;
 }
 
-/* 버튼 내부 텍스트 */
-[class*="st-key-chat_room_"] button [data-testid="stMarkdownContainer"] {
+/* Markdown 영역 왼쪽 정렬 */
+[class*="st-key-chat_room_"] [data-testid="stMarkdownContainer"] {
+    width: 100%;
     text-align: left;
-    margin: 0;
 }
 
 /* 채팅방 버튼에 마우스를 올렸을 때 */
 [class*="st-key-chat_room_"] button:hover {
-    background-color: #f8f9fa;
+    background-color: #E2EBFB;
     border-color: #bfc5cc;
 }
 
@@ -34,63 +34,71 @@
     outline-offset: 2px;
 }
 
-
 /* ==========================================
     2. 채팅방 내부 메시지
 ========================================== */
 
-/* 메시지 말풍선 공통 스타일 */
+/* 메시지 + 시간을 묶는 전체 영역 */
 [class*="st-key-chat-msg-"] {
     width: fit-content;
     max-width: 75%;
-
-    padding: 10px 14px;
-    margin-bottom: 12px;
-
-    border-radius: 12px;
-    overflow-wrap: anywhere;
+    margin-bottom: 18px;
 }
 
 /* 상대방 메시지 - 왼쪽 */
 [class*="st-key-chat-msg-other-"] {
     margin-left: 0;
     margin-right: auto;
-
-    background-color: #f1f3f5;
-    border-top-left-radius: 3px;
 }
 
 /* 내 메시지 - 오른쪽 */
 [class*="st-key-chat-msg-me-"] {
     margin-left: auto;
     margin-right: 0;
+}
 
-    background-color: #dbeafe;
+/* 실제 말풍선 */
+[class*="st-key-bubble-"] {
+    padding: 14px 18px 27px 18px;
+    border-radius: 16px;
+    overflow-wrap: anywhere;
+}
+
+/* 상대방 말풍선 색상 */
+[class*="st-key-chat-msg-other-"] [class*="st-key-bubble-"] {
+    background-color: #E2EBFB;
+    border-top-left-radius: 3px;
+}
+
+/* 내 말풍선 색상 */
+[class*="st-key-chat-msg-me-"] [class*="st-key-bubble-"] {
+    background-color: #3168D5;
+    color:#ffffff;
     border-top-right-radius: 3px;
 }
 
 /* 메시지 내용 */
-[class*="st-key-chat-msg-"] p {
+[class*="st-key-bubble-"] p {
     margin: 0;
     text-align: left;
     line-height: 1.5;
 }
 
-/* 메시지 작성 시간 */
+/* 말풍선 밖 시간 */
 [class*="st-key-chat-msg-"] [data-testid="stCaptionContainer"] {
     font-size: 11px;
-    color: #888888;
-    margin-top: 4px;
+    color: #999999;
+    margin-top: 2px;
 }
 
-/* 내 메시지의 시간 - 오른쪽 정렬 */
-[class*="st-key-chat-msg-me-"] [data-testid="stCaptionContainer"] {
-    text-align: right;
-}
-
-/* 상대방 메시지의 시간 - 왼쪽 정렬 */
+/* 상대방 시간 - 왼쪽 */
 [class*="st-key-chat-msg-other-"] [data-testid="stCaptionContainer"] {
     text-align: left;
+}
+
+/* 내 시간 - 오른쪽 */
+[class*="st-key-chat-msg-me-"] [data-testid="stCaptionContainer"] {
+    text-align: right;
 }
 
 
