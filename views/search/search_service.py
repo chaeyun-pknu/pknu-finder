@@ -1,4 +1,4 @@
-from database import get_supabase_client
+from DB.database import get_supabase_client
 
 
 def search_items(keyword, search_type="전체"):
