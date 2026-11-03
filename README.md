@@ -235,7 +235,7 @@ pknu-finder/
 | 이름 | 역할 | GitHub |
 |---|---|---|
 | 김채윤 | 팀장 | [chaeyun-pknu](https://github.com/chaeyun-pknu) |
-| 이민범 | 개발 리드 | [alsqja03](https://github.com/alsqja03) |
+| 이민범 | 개발 리드 | [alsqja03](https://github.com/alsqja03), [GuReum03](https://github.com/GuReum03) |
 | 박유진 | 문서 담당 | [yujinsutu](https://github.com/yujinsutu) |
 | 윤한희 | 리뷰·품질 담당 | [yoonhanhee](https://github.com/yoonhanhee) |
 
