@@ -102,7 +102,9 @@ https://abcdefghijklmnop.supabase.co
 
 ## 3. 데이터베이스 테이블 생성
 
-PKNU Finder에서는 사용자 정보 `users`, 분실물 게시글 `lost_items`, 이미지 경로 `lost_item_images`, 북마크 `bookmarks`, 채팅 정보 `chats`를 관리합니다.
+PKNU Finder에서는 사용자 정보 `users`, 분실물 게시글 `lost_items`, 이미지 경로 `lost_item_images`, 북마크 `bookmarks`, 채팅방 `chat_rooms`, 채팅 메시지 `chats` 총 6개의 테이블을 관리합니다.
+
+> 외래 키 설정으로 `users` → `lost_items` → `lost_item_images` → `bookmarks` → `chat_rooms` → `chats` 순서로 생성해야 합니다.
 
 테이블은 Supabase Dashboard의 SQL Editor에서 SQL 명령어를 실행하여 생성합니다.
 
@@ -123,14 +125,18 @@ Supabase Authentication에서 관리하는 사용자 ID와 연결하여 사용�
 | 컬럼 | 자료형 | 제약 조건 | 설명 |
 |---|---|---|---|
 | id | UUID | PK, FK | Supabase Auth 사용자 ID |
-| username | TEXT | NOT NULL | 사용자 이름 |
+| username | TEXT | NOT NULL | 사용자 이름(닉네임) |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() | 계정 생성 시각 |
+| is_deleted | BOOLEAN | NOT NULL, DEFAULT FALSE | 회원 탈퇴 여부 |
+| deleted_at | TIMESTAMPTZ | - | 회원 탈퇴 시각 |
 
 ```sql
 CREATE TABLE public.users (
-    id UUID PRIMARY KEY REFERENCES auth.users(id),
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     username TEXT NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    deleted_at TIMESTAMPTZ
 );
 ```
 
@@ -139,7 +145,11 @@ CREATE TABLE public.users (
 - 사용자의 실제 인증 정보는 `auth.users`에서 관리합니다.
 - `public.users`는 서비스에서 필요한 사용자 정보를 관리하기 위한 테이블입니다.
 - `users.id`에는 Supabase Auth에서 발급한 UUID를 사용합니다.
-- 별도의 숫자형 사용자 ID를 발급하여 사용자를 관리하지 않습니다.
+- 별도의 숫자형 사용자 ID를 발급하여 사용하지 않습니다.
+- `auth.users`의 행이 삭제되면 `users`의 행도 함께 삭제됩니다. (`ON DELETE CASCADE`)
+- 로그인(이메일, Google, GitHub)에 성공하면 앱이 `id`, `username`을 `users`에 저장(upsert)합니다.
+- 회원 탈퇴는 행을 삭제하지 않고 `is_deleted = TRUE`, `deleted_at`을 기록하는 방식(Soft Delete)입니다. `is_deleted`가 `TRUE`인 계정은 다시 로그인할 수 없습니다. (10-2 참고)
+- 닉네임 중복은 앱 코드에서 `username`을 대소문자 구분 없이 비교해 확인하며, DB에는 `username`의 UNIQUE 제약이 없습니다.
 
 ### 3-3. lost_items 테이블
 
@@ -156,6 +166,7 @@ CREATE TABLE public.users (
 | status | TEXT | DEFAULT '습득' | 게시글 상태 |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() | 게시글 작성 시각 |
 | user_id | UUID | FK | 게시글 작성자 ID |
+| tags | TEXT[] | NOT NULL, DEFAULT '{}' | 게시글 태그 목록 |
 
 ```sql
 CREATE TABLE public.lost_items (
@@ -167,16 +178,21 @@ CREATE TABLE public.lost_items (
     lost_date TEXT,
     status TEXT DEFAULT '습득',
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    user_id UUID REFERENCES public.users(id)
+    user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    tags TEXT[] NOT NULL DEFAULT '{}'
 );
 ```
 
 **주요 사항**
 
 - `id`는 게시글마다 자동으로 생성되는 고유 번호입니다.
-- `user_id`는 게시글을 작성한 사용자의 UUID입니다.
-- `status`의 기본값은 `습득`입니다.
-- `user_id`를 통해 게시글 작성자와 사용자 정보를 연결합니다.
+- `user_id`는 게시글을 작성한 사용자의 UUID이며, 작성자와 사용자 정보를 연결합니다.
+- `status`의 기본값은 `습득`입니다. 앱은 등록 화면의 `분실물`/`습득물` 선택을 `분실`/`습득`으로 변환해 저장하고, 검색도 이 값으로 필터링합니다. DB에는 허용값을 제한하는 CHECK 제약이 없으므로 코드에서 이 두 값을 통일해 사용해야 합니다.
+- `lost_date`는 TEXT이므로 `YYYY-MM-DD` 형식의 문자열로 저장합니다. (Python에서는 `date.isoformat()`)
+- `category`에는 등록 화면의 카테고리 목록 값(예: 전자기기, 지갑·카드·신분증 등)이 저장됩니다.
+- `tags`는 문자열 배열이며, 등록 화면에서는 최대 10개까지 입력할 수 있습니다.
+- 작성자(`users`)의 행이 삭제되면 `user_id`는 NULL로 바뀝니다. (`ON DELETE SET NULL`)
+- 채팅방(`chat_rooms`)이 있는 게시글은 바로 삭제할 수 없습니다. (3-9 참고)
 
 ### 3-4. lost_item_images 테이블
 
@@ -206,8 +222,8 @@ CREATE TABLE public.lost_item_images (
 
 - 하나의 게시글에 여러 이미지를 등록할 수 있습니다.
 - `lost_item_id`를 이용하여 게시글과 이미지를 연결합니다.
-- 게시글이 삭제되면 연결된 이미지 경로 데이터도 함께 삭제됩니다.
 - 실제 이미지 파일은 Supabase Storage에서 별도로 관리합니다.
+- 게시글이 삭제되면 연결된 이미지 경로 데이터도 함께 삭제됩니다. (`ON DELETE CASCADE`)
 
 ### 3-5. bookmarks 테이블
 
@@ -222,44 +238,163 @@ CREATE TABLE public.lost_item_images (
 ```sql
 CREATE TABLE public.bookmarks (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES public.users(id),
-    item_id BIGINT NOT NULL REFERENCES public.lost_items(id)
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    item_id BIGINT NOT NULL REFERENCES public.lost_items(id) ON DELETE CASCADE
 );
 ```
 
 **주요 사항**
 
 - 사용자와 게시글의 관계를 관리합니다.
-- `user_id`는 북마크를 등록한 사용자입니다.
-- `item_id`는 북마크 대상 게시글입니다.
+- `user_id`는 북마크를 등록한 사용자, `item_id`는 북마크 대상 게시글입니다.
+- `(user_id, item_id)`에 UNIQUE 제약이 없으므로 같은 게시글이 중복 북마크될 수 있습니다. (3-10 참고)
+- 사용자 또는 게시글이 삭제되면 관련 북마크도 함께 삭제됩니다. (`ON DELETE CASCADE`)
+- 회원 탈퇴(Soft Delete) 시에는 앱이 해당 사용자의 북마크를 직접 삭제합니다.
 
-### 3-6. chats 테이블
+### 3-6. chat_rooms 테이블
 
-게시글과 관련된 사용자 간의 채팅 메시지를 저장합니다.
+게시글을 기준으로 두 사용자 사이의 채팅방 정보를 저장합니다. 개별 메시지는 `chats` 테이블에 저장합니다.
 
 | 컬럼 | 자료형 | 제약 조건 | 설명 |
 |---|---|---|---|
-| id | BIGINT | PK, IDENTITY | 메시지 고유 ID |
-| item_id | BIGINT | FK, NOT NULL | 관련 게시글 ID |
-| user_id | UUID | FK, NOT NULL | 메시지 작성자 ID |
-| message | TEXT | NOT NULL | 메시지 내용 |
-| timestamp | TEXT | DEFAULT NOW() | 메시지 작성 시각 |
+| id | BIGINT | PK, IDENTITY | 채팅방 고유 ID |
+| item_id | BIGINT | FK, NOT NULL | 채팅이 시작된 게시글 ID |
+| user1_id | UUID | FK, NOT NULL | 채팅 참여자 1의 사용자 ID |
+| user2_id | UUID | FK, NOT NULL | 채팅 참여자 2의 사용자 ID |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | 채팅방 생성 시각 |
 
 ```sql
-CREATE TABLE public.chats (
+CREATE TABLE public.chat_rooms (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     item_id BIGINT NOT NULL REFERENCES public.lost_items(id),
-    user_id UUID NOT NULL REFERENCES public.users(id),
-    message TEXT NOT NULL,
-    timestamp TEXT DEFAULT NOW()::TEXT
+    user1_id UUID NOT NULL REFERENCES public.users(id),
+    user2_id UUID NOT NULL REFERENCES public.users(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ```
 
 **주요 사항**
 
-- `item_id`를 이용하여 어떤 게시글과 관련된 대화인지 구분합니다.
-- `user_id`를 통해 메시지 작성자를 확인합니다.
-- 메시지 작성 시각은 `timestamp`에 저장합니다.
+- `item_id`로 어떤 게시글에서 시작된 채팅방인지 구분합니다.
+- `user1_id`, `user2_id`는 채팅방에 참여하는 두 사용자입니다. 어느 쪽이 먼저 들어가는지에 대한 규칙은 없으므로, 조회할 때는 두 순서를 모두 고려해야 합니다.
+- `item_id`, `user1_id`, `user2_id`의 삭제 규칙은 `NO ACTION`입니다. 따라서 채팅방이 남아 있는 게시글이나 사용자는 삭제할 수 없고, 채팅방을 삭제하려면 해당 채팅방의 `chats` 메시지를 먼저 삭제해야 합니다. (3-9 참고)
+- `user1_id`와 `user2_id`가 서로 다르도록 강제하는 제약, 그리고 같은 게시글에서 같은 두 사용자의 채팅방 중복 생성을 막는 제약은 현재 스키마에 없습니다. (3-10 참고)
+
+### 3-7. chats 테이블
+
+채팅방 안에서 주고받은 개별 메시지를 저장합니다.
+
+| 컬럼 | 자료형 | 제약 조건 | 설명 |
+|---|---|---|---|
+| id | BIGINT | PK, IDENTITY | 메시지 고유 ID |
+| item_id | BIGINT | FK, NOT NULL | 관련 게시글 ID |
+| user_id | UUID | FK, NOT NULL | 메시지 작성자(발신자) ID |
+| message | TEXT | NOT NULL | 메시지 내용 |
+| timestamp | TIMESTAMPTZ | DEFAULT NOW() | 메시지 작성 시각 |
+| room_id | BIGINT | FK, NOT NULL | 메시지가 속한 채팅방 ID |
+| receiver_id | UUID | FK, NOT NULL | 메시지 수신자 ID |
+
+```sql
+CREATE TABLE public.chats (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    item_id BIGINT NOT NULL REFERENCES public.lost_items(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    message TEXT NOT NULL,
+    timestamp TIMESTAMPTZ DEFAULT NOW(),
+    room_id BIGINT NOT NULL REFERENCES public.chat_rooms(id),
+    receiver_id UUID NOT NULL REFERENCES public.users(id)
+);
+```
+
+**주요 사항**
+
+- `room_id`로 메시지가 속한 채팅방을 구분합니다. 메시지를 조회할 때는 `item_id`가 아니라 `room_id`를 기준으로 해야 서로 다른 채팅방의 대화가 섞이지 않습니다.
+- `item_id`는 `chat_rooms.item_id`와 같은 값을 저장해야 합니다. (DB가 이를 강제하지는 않습니다.)
+- `user_id`는 발신자, `receiver_id`는 수신자입니다.
+- 메시지 작성 시각은 `timestamp`에 저장되며 자료형은 TIMESTAMPTZ입니다.
+- 삭제 규칙은 `item_id`, `user_id`가 `CASCADE`, `room_id`, `receiver_id`가 `NO ACTION`입니다. (3-9 참고)
+- 채팅 화면은 현재 개발 중입니다.
+
+### 3-8. 앱에서 사용하는 값 정리
+
+| 항목 | 값 | 사용 위치 |
+|---|---|---|
+| `lost_items.status` | `분실`, `습득` | 게시글 등록, 검색 필터 |
+| `lost_items.lost_date` | `YYYY-MM-DD` 문자열 | 게시글 등록 |
+| `lost_items.tags` | 문자열 배열(최대 10개) | 게시글 등록 |
+| Storage 경로(`image_path`) | `{게시글 ID}/{랜덤 hex}.{jpg\|jpeg\|png}` | 이미지 업로드 |
+| 탈퇴 계정 닉네임 | `탈퇴한 유저_{사용자 ID 앞 8자리}` | 회원 탈퇴 |
+
+### 3-9. 외래 키 삭제 규칙
+
+2026-11-03 기준 실제 DB에서 확인한 외래 키의 삭제 규칙입니다.
+
+| 컬럼 | 참조 대상 | 삭제 규칙 |
+|---|---|---|
+| users.id | auth.users.id | CASCADE |
+| lost_items.user_id | users.id | SET NULL |
+| lost_item_images.lost_item_id | lost_items.id | CASCADE |
+| bookmarks.user_id | users.id | CASCADE |
+| bookmarks.item_id | lost_items.id | CASCADE |
+| chat_rooms.item_id | lost_items.id | NO ACTION |
+| chat_rooms.user1_id | users.id | NO ACTION |
+| chat_rooms.user2_id | users.id | NO ACTION |
+| chats.item_id | lost_items.id | CASCADE |
+| chats.user_id | users.id | CASCADE |
+| chats.room_id | chat_rooms.id | NO ACTION |
+| chats.receiver_id | users.id | NO ACTION |
+
+`NO ACTION`은 참조하는 행이 남아 있으면 삭제를 거부합니다.
+
+**삭제 시 영향**
+
+- **게시글 삭제**: 이미지 경로(`lost_item_images`)와 북마크는 함께 삭제됩니다. 하지만 `chat_rooms`가 있으면 삭제가 거부되므로 `chats` → `chat_rooms` → `lost_items` 순서로 삭제해야 합니다. Storage의 이미지 파일은 자동으로 삭제되지 않습니다.
+- **채팅방 삭제**: 해당 채팅방의 `chats` 메시지를 먼저 삭제해야 합니다.
+- **사용자 완전 삭제(Hard Delete)**: `users` 행이 삭제되면 북마크와 보낸 메시지(`chats.user_id`)가 함께 삭제되고 게시글의 `user_id`는 NULL이 됩니다. 단, 채팅방(`chat_rooms`)이나 받은 메시지(`chats.receiver_id`)가 남아 있으면 삭제가 거부됩니다. 현재 앱은 Soft Delete를 사용하므로 해당되지 않습니다. (10-2 참고)
+
+**삭제 규칙 다시 확인하기**
+
+`confdeltype`이 `c`이면 CASCADE, `n`이면 SET NULL, `a`이면 NO ACTION입니다.
+
+```sql
+SELECT conrelid::regclass AS table_name, conname, confdeltype
+FROM pg_constraint
+WHERE contype = 'f' AND connamespace = 'public'::regnamespace
+ORDER BY conrelid::regclass::text, conname;
+```
+
+### 3-10. 현재 스키마에 없는 제약 조건 (권장) 및 확인 쿼리
+
+> 이 절의 SQL은 **현재 DB에 적용되어 있지 않은 권장 사항**입니다. 필요할 때 SQL Editor에서 실행합니다.
+> 이미 중복된 데이터가 있으면 제약 조건 추가가 실패하므로, 먼저 중복 데이터를 정리해야 합니다.
+
+**북마크 중복 방지**
+
+```sql
+ALTER TABLE public.bookmarks
+ADD CONSTRAINT bookmarks_user_item_unique UNIQUE (user_id, item_id);
+```
+
+**채팅방 중복 및 자기 자신과의 채팅 방지**
+
+두 사용자의 순서(`user1_id`, `user2_id`)가 바뀌어도 같은 채팅방으로 취급하도록 인덱스를 만듭니다.
+
+```sql
+ALTER TABLE public.chat_rooms
+ADD CONSTRAINT chat_rooms_users_different CHECK (user1_id <> user2_id);
+
+CREATE UNIQUE INDEX chat_rooms_unique_pair
+ON public.chat_rooms (item_id, LEAST(user1_id, user2_id), GREATEST(user1_id, user2_id));
+```
+
+**현재 인덱스 확인**
+
+```sql
+SELECT tablename, indexname, indexdef
+FROM pg_indexes
+WHERE schemaname = 'public'
+ORDER BY tablename, indexname;
+```
 
 ---
 
@@ -274,7 +409,10 @@ erDiagram
     LOST_ITEMS ||--o{ LOST_ITEM_IMAGES : "이미지 보유"
     USERS ||--o{ BOOKMARKS : "북마크 등록"
     LOST_ITEMS ||--o{ BOOKMARKS : "북마크 대상"
-    USERS ||--o{ CHATS : "메시지 작성"
+    LOST_ITEMS ||--o{ CHAT_ROOMS : "채팅 시작"
+    USERS ||--o{ CHAT_ROOMS : "참여 (user1_id, user2_id)"
+    CHAT_ROOMS ||--o{ CHATS : "메시지 보유"
+    USERS ||--o{ CHATS : "발신 / 수신"
     LOST_ITEMS ||--o{ CHATS : "대화 연결"
 
     AUTH_USERS {
@@ -285,6 +423,8 @@ erDiagram
         uuid id PK,FK
         text username
         timestamptz created_at
+        boolean is_deleted
+        timestamptz deleted_at
     }
 
     LOST_ITEMS {
@@ -297,6 +437,7 @@ erDiagram
         text status
         timestamptz created_at
         uuid user_id FK
+        text[] tags
     }
 
     LOST_ITEM_IMAGES {
@@ -312,12 +453,22 @@ erDiagram
         bigint item_id FK
     }
 
+    CHAT_ROOMS {
+        bigint id PK
+        bigint item_id FK
+        uuid user1_id FK
+        uuid user2_id FK
+        timestamptz created_at
+    }
+
     CHATS {
         bigint id PK
         bigint item_id FK
         uuid user_id FK
         text message
-        text timestamp
+        timestamptz timestamp
+        bigint room_id FK
+        uuid receiver_id FK
     }
 ```
 
@@ -330,7 +481,10 @@ erDiagram
 | lost_items → lost_item_images | 한 게시글에 여러 이미지 등록 가능 |
 | users → bookmarks | 한 사용자가 여러 게시글 북마크 가능 |
 | lost_items → bookmarks | 하나의 게시글을 여러 사용자가 북마크 가능 |
-| users → chats | 한 사용자가 여러 메시지 작성 가능 |
+| lost_items → chat_rooms | 하나의 게시글에서 여러 채팅방 생성 가능 |
+| users → chat_rooms | 한 사용자가 `user1_id` 또는 `user2_id`로 여러 채팅방에 참여 가능 |
+| chat_rooms → chats | 하나의 채팅방에 여러 메시지 연결 가능 |
+| users → chats | 한 사용자가 발신자(`user_id`) 또는 수신자(`receiver_id`)로 여러 메시지에 연결 가능 |
 | lost_items → chats | 하나의 게시글에 여러 메시지 연결 가능 |
 
 ---
@@ -343,13 +497,16 @@ RLS는 데이터베이스의 행 단위 접근 권한을 제어하는 보안 기
 
 ### 5-1. RLS 활성화
 
-SQL Editor에서 다음 SQL을 실행합니다.
+현재 PKNU Finder의 6개 테이블은 모두 RLS가 활성화되어 있습니다. (2026-11-03 확인)
+
+새 Supabase 프로젝트를 구성하는 경우 SQL Editor에서 다음 SQL을 실행합니다.
 
 ```sql
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.lost_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.lost_item_images ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bookmarks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.chat_rooms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chats ENABLE ROW LEVEL SECURITY;
 ```
 
@@ -366,9 +523,61 @@ WHERE schemaname = 'public'
 ORDER BY tablename;
 ```
 
-`rowsecurity` 값이 `true`이면 해당 테이블의 RLS가 활성화된 것입니다.
+`rowsecurity` 값이 `true`이면 해당 테이블의 RLS가 활성화된 것입니다. 현재는 `bookmarks`, `chat_rooms`, `chats`, `lost_item_images`, `lost_items`, `users` 모두 `true`입니다.
 
-### 5-3. RLS 정책 설정 시 주의 사항
+각 테이블에 설정된 정책(Policy)은 다음 SQL로 확인할 수 있습니다.
+
+```sql
+SELECT tablename, policyname, cmd, roles
+FROM pg_policies
+WHERE schemaname = 'public'
+ORDER BY tablename, policyname;
+```
+
+### 5-3. 현재 적용된 RLS 정책
+
+2026-11-03 기준 실제 DB에 설정된 정책입니다.
+
+| 테이블 | 정책 | 작업 | 대상 |
+|---|---|---|---|
+| users | 없음 | - | - |
+| lost_items | 없음 | - | - |
+| lost_item_images | 없음 | - | - |
+| bookmarks | 없음 | - | - |
+| chat_rooms | Participants can view chat rooms | SELECT | authenticated |
+| chat_rooms | Participants can create chat rooms | INSERT | authenticated |
+| chats | Participants can view messages | SELECT | authenticated |
+| chats | Participants can send messages | INSERT | authenticated |
+
+- **정책이 없는 테이블**(`users`, `lost_items`, `lost_item_images`, `bookmarks`)은 RLS가 켜져 있으므로 `anon` 키나 로그인 사용자 키로는 읽거나 쓸 수 없고, `service_role` 키로만 접근할 수 있습니다.
+- `chat_rooms`, `chats`에는 `authenticated`(로그인 사용자) 대상의 조회·생성 정책만 있습니다. 수정(UPDATE)과 삭제(DELETE) 정책은 없습니다.
+- 현재 앱 코드는 `service_role` 키를 우선 사용하므로 RLS를 우회합니다. 따라서 위 정책들은 사용자 인증이 적용된 클라이언트로 바꿨을 때부터 실제로 적용됩니다.
+
+**정책 조건**
+
+| 테이블 | 작업 | 조건 (`auth.uid()` = 로그인한 사용자) |
+|---|---|---|
+| chat_rooms | SELECT | `user1_id` 또는 `user2_id`가 로그인한 사용자일 때만 조회 가능 |
+| chat_rooms | INSERT | `user1_id` 또는 `user2_id` 중 하나가 로그인한 사용자일 때만 생성 가능 |
+| chats | SELECT | 메시지가 속한 채팅방(`room_id`)의 참여자일 때만 조회 가능 |
+| chats | INSERT | `user_id`가 로그인한 사용자 본인이고, 해당 채팅방의 참여자이며, `receiver_id`가 그 채팅방의 상대방일 때만 전송 가능 |
+
+**정책이 막아주지 않는 부분**
+
+- `chats.item_id`가 `chat_rooms.item_id`와 같은지는 정책이 검사하지 않습니다. 메시지를 저장할 때 코드에서 같은 값을 넣어야 합니다.
+- `chat_rooms`의 `user1_id`와 `user2_id`가 서로 다른지, 같은 두 사용자의 채팅방이 중복 생성되는지도 정책이 막지 않습니다. (3-10 참고)
+- UPDATE, DELETE 정책이 없으므로 로그인 사용자 키로는 채팅방과 메시지를 수정하거나 삭제할 수 없습니다.
+
+정책 조건은 다음 SQL로 다시 확인할 수 있습니다.
+
+```sql
+SELECT tablename, policyname, qual, with_check
+FROM pg_policies
+WHERE schemaname = 'public' AND tablename IN ('chat_rooms', 'chats')
+ORDER BY tablename, policyname;
+```
+
+### 5-4. RLS 정책 설정 시 주의 사항
 
 RLS를 활성화하는 것만으로 모든 사용자에게 접근 권한이 부여되는 것은 아닙니다.
 
@@ -382,7 +591,8 @@ PKNU Finder에서 고려해야 할 정책은 다음과 같습니다.
 | lost_items | 게시글 조회는 서비스 공개 범위에 맞게 허용하고, 수정 및 삭제는 작성자 중심으로 제한 |
 | lost_item_images | 연결된 게시글의 접근 권한과 이미지 접근 권한을 일치시킴 |
 | bookmarks | 본인의 북마크만 조회, 등록, 삭제 |
-| chats | 관련 게시글의 대화 참여자만 조회 및 작성할 수 있도록 제한 |
+| chat_rooms | 채팅방 참여자(`user1_id`, `user2_id`)만 조회 및 생성 |
+| chats | 해당 채팅방의 참여자만 조회 및 작성할 수 있도록 제한 |
 
 **위 표는 정책 설계 방향입니다. 추후 개발에 따라 달라질 수 있습니다.**
 
@@ -442,11 +652,11 @@ Private Bucket은 파일 업로드, 조회, 삭제에 필요한 접근 정책을
 
 현재 프로젝트에서는 서버 측 관리자 클라이언트를 이용한 업로드 방식을 사용하고 있습니다. 따라서 관리자 키가 노출되지 않도록 주의하고, 서버 코드에서 로그인 사용자와 게시글 작성자의 권한을 확인해야 합니다.
 
+게시글 등록 시 이미지는 `lost-item-images/{게시글 ID}/{랜덤 hex}.{확장자}` 경로로 업로드됩니다. 업로드 후 경로를 `lost_item_images`에 저장하는 데 실패하면 업로드한 파일을 바로 삭제합니다.
+
 또한 게시글이 삭제되면 `lost_item_images`의 DB 레코드는 `ON DELETE CASCADE`에 의해 삭제되지만, Storage에 저장된 실제 파일까지 자동으로 삭제되는 것은 아닙니다.
 
-따라서 게시글 삭제 기능을 구현할 때는 Storage 파일도 별도로 삭제하는 처리가 필요합니다.
-
-**추후 개발 후 수정 될 사항**
+따라서 게시글 삭제 기능을 구현할 때는 Storage 파일도 별도로 삭제하는 처리가 필요합니다. 채팅방이 있는 게시글의 삭제 순서는 3-9를 참고합니다.
 
 ---
 
@@ -511,27 +721,29 @@ Supabase 프로젝트와 Streamlit 애플리케이션을 연결하기 위해 환
 
 ### 8-1. `.streamlit/secrets.toml` 생성
 
-프로젝트 루트에 `.streamlit` 폴더를 생성합니다.
+프로젝트 루트에 `.streamlit` 폴더가 있으며, 예시 파일이 포함되어 있습니다.
 
 ```text
 project/
 ├── .github
 ├── .streamlit/
-│   └── secrets.toml
+│   ├── secrets.toml.example   # 예시 파일 (Git 포함)
+│   └── secrets.toml           # 실제 값 (Git 제외, 직접 생성)
 ├── main.py
 └── ...
 ```
 
-`secrets.toml` 파일에 다음 내용을 작성합니다.
+`secrets.toml.example`을 복사하여 `secrets.toml`을 만들고 다음 내용을 작성합니다.
 
 ```toml
-[supabase]
 SUPABASE_URL = "https://your-project-id.supabase.co"
 SUPABASE_ANON_KEY = "your-publishable-or-anon-key"
 SUPABASE_SERVICE_ROLE_KEY = "your-secret-service-role-key"
-SUPABASE_REDIRECT_URL = "your-redirect-url"
+SUPABASE_REDIRECT_URL = "http://localhost:8501"
 ```
+
 실제 프로젝트 URL과 API Key, Redirect URL로 변경해야 합니다.
+위 값들을 `[supabase]` 섹션 아래에 같은 이름으로 작성해도 인식됩니다.
 
 ### 8-2. 환경 변수 설명
 
@@ -603,6 +815,7 @@ Supabase Dashboard의 **Table Editor**로 이동합니다.
 - `lost_items`
 - `lost_item_images`
 - `bookmarks`
+- `chat_rooms`
 - `chats`
 
 각 테이블을 클릭하여 컬럼과 자료형이 올바르게 설정되었는지 확인합니다.
@@ -638,29 +851,30 @@ public.users.id
       │
       ├── lost_items.user_id
       ├── bookmarks.user_id
-      └── chats.user_id
+      ├── chat_rooms.user1_id
+      ├── chat_rooms.user2_id
+      ├── chats.user_id
+      └── chats.receiver_id
 ```
 
 따라서 사용자 관련 외래 키의 자료형도 `UUID`로 통일해야 합니다.
 
 ### 10-2. 회원 탈퇴 시 관련 데이터 처리
 
-회원 탈퇴 기능을 구현할 때는 Supabase Auth 계정뿐만 아니라 관련 데이터도 고려해야 합니다.
+현재 회원 탈퇴는 데이터를 삭제하지 않고 계정을 비활성화하는 방식(Soft Delete)으로 구현되어 있습니다. (`views/mypage/auth.py`의 `delete_user`)
 
-| 대상 | 고려 사항 |
+| 대상 | 처리 내용 |
 |---|---|
-| auth.users | Supabase Auth 계정 삭제 |
-| users | 사용자 기본 정보 삭제 |
-| lost_items | 게시글 삭제 또는 작성자 정보 익명화 |
-| lost_item_images | 게시글 이미지 경로 및 Storage 파일 정리 |
-| bookmarks | 사용자 북마크 삭제 |
-| chats | 대화 상대방의 기록을 고려한 처리 |
+| users | 행은 유지하고 `username`을 `탈퇴한 유저_{ID 앞 8자리}`로 변경, `is_deleted = TRUE`, `deleted_at` 기록 |
+| bookmarks | 해당 사용자의 북마크 삭제 |
+| auth.users | Supabase Auth 계정 Soft Delete |
+| lost_items | 유지 (작성자 이름은 `탈퇴한 유저`로 표시) |
+| lost_item_images | 유지 |
+| chat_rooms, chats | 유지 |
 
-현재 테이블 관계에서는 일부 외래 키가 삭제를 제한할 수 있습니다. 따라서 회원 탈퇴를 구현하기 전에 외래 키의 삭제 동작과 데이터 보존 정책을 결정해야 합니다.
-
-또한 Storage 파일을 소유한 사용자는 해당 파일을 먼저 정리해야 Auth 계정 삭제가 정상적으로 수행될 수 있습니다.
-
-**추후 개발에 맞추어 수정할 예정**
+- `users` 행이 남아 있으므로 `lost_items`, `chat_rooms`, `chats`의 외래 키가 깨지지 않습니다.
+- `is_deleted`가 `TRUE`인 계정은 로그인 시 `탈퇴 처리된 계정입니다.`로 차단되어 같은 계정으로 다시 가입·로그인할 수 없습니다.
+- Auth 계정을 완전히 삭제(Hard Delete)하는 방식으로 바꾸려면 삭제 규칙(3-9)을 먼저 검토해야 합니다. 채팅방이나 받은 메시지가 남아 있는 사용자는 `NO ACTION` 때문에 삭제가 거부됩니다.
 
 ### 10-3. 관리자 키 보안
 
@@ -680,11 +894,12 @@ public.users.id
 특히 다음 파일을 확인합니다.
 
 - `main.py`
-- `database/database.py`
-- `views/mypage/auth.py`
-- 게시글 등록 및 조회 관련 파일
+- `DB/database.py`
+- `views/mypage/auth.py` (로그인, 회원가입, 회원 탈퇴)
 - `views/mypage/mypage.py`
-- 채팅 관련 파일
+- `views/register/register.py` (게시글 등록, 이미지 업로드)
+- `views/search/search_service.py` (게시글 검색)
+- 채팅 관련 파일 (개발 중)
 
 DB 구조와 Python 코드가 일치하지 않으면 데이터 조회 및 등록 과정에서 오류가 발생할 수 있습니다.
 
