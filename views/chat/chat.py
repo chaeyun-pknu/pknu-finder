@@ -1,4 +1,12 @@
 import streamlit as st
+from pathlib import Path
+
+# CSS 파일 경로
+CSS_PATH = Path(__file__).parent / "chat.css"
+
+def load_chat_css():
+    with open(CSS_PATH, encoding="utf-8") as f:
+        st.html(f"<style>{f.read()}</style>")
 
 # ==========================================
 # 1. 임시 채팅 데이터
@@ -168,6 +176,9 @@ def render_chat():
 
     init_chat_state()
 
+    # 채팅 CSS 적용
+    load_chat_css()
+    
     selected_room = st.session_state.selected_room
 
     if selected_room is None:
