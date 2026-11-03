@@ -44,30 +44,14 @@ git clone https://github.com/chaeyun-pknu/pknu-finder.git
 cd pknu-finder
 ```
 
-### 2. 가상환경 생성 및 활성화 (권장)
-
-**macOS / Linux**
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-**Windows (PowerShell)**
-
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-```
-
-### 3. 패키지 설치
+### 2. 패키지 설치
 
 ```bash
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 4. Supabase 접속 정보 설정
+### 3. Supabase 접속 정보 설정
 
 앱을 실행하려면 Supabase 프로젝트의 접속 정보가 필요합니다. 보안을 위해 실제 접속 키는 Git 저장소에 포함하지 않습니다.
 
@@ -110,7 +94,7 @@ SUPABASE_REDIRECT_URL = "http://localhost:8501"
 > - 키가 외부에 노출되었다면 해당 키를 Supabase 대시보드에서 교체하고, 저장소에 남은 비밀 정보도 제거해야 합니다.
 > - 팀 프로젝트의 접속 정보는 프로젝트 담당자에게 안전한 방법으로 전달받으세요.
 
-### 5. 앱 실행
+### 4. 앱 실행
 
 Streamlit 애플리케이션이므로 `python main.py`가 아니라 다음 명령으로 실행합니다.
 
