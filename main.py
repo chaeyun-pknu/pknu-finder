@@ -14,7 +14,7 @@ from views.register.register import (
     clear_register_state,
 )
 from views.search.search import render_search
-from views.chat.chat import render_chat
+#from views.chat.chat import render_chat
 from views.mypage.mypage import render_mypage
 
 # 로그인 및 회원가입
