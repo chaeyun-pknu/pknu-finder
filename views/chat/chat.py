@@ -1,6 +1,7 @@
 import streamlit as st
 from pathlib import Path
 from html import escape
+from DB.database import get_supabase_client
 
 # CSS 파일 경로
 CSS_PATH = Path(__file__).parent / "chat.css"
