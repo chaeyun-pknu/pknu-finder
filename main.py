@@ -1,6 +1,6 @@
 import streamlit as st
 
-from database import (
+from DB.database import (
     DatabaseConfigurationError,
     DatabaseOperationError,
     get_username,
@@ -14,6 +14,8 @@ from views.register.register import (
     clear_register_state,
 )
 from views.search.search import render_search
+from views.chat.chat import render_chat
+from views.mypage.mypage import render_mypage
 
 # 로그인 및 회원가입
 from views.mypage.social_button import render_social_login_buttons
@@ -28,7 +30,7 @@ from views.mypage.auth import (
 
 st.set_page_config(
     page_title="PKNU Finder",
-    page_icon="🔎",
+    page_icon="docs/images/pknufinder_logo.png",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -122,8 +124,7 @@ def render_selected_page(menu: str) -> None:
         render_home()
 
     elif menu == "마이페이지":
-        st.title("마이페이지")
-        st.info("마이페이지는 준비 중입니다.")
+        render_mypage()
 
     elif menu == "분실물/습득물 검색":
         render_search()

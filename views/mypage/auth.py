@@ -1,9 +1,10 @@
+import re
 import secrets
 import time
-
+from datetime import datetime, timezone
 import streamlit as st
 
-from database import create_auth_client, get_supabase_admin_client
+from DB.database import create_auth_client, get_supabase_admin_client
 
 
 # OAuth 인증 후 리다이렉트 주소 설정
@@ -36,8 +37,10 @@ def _build_redirect_url(flow_key: str) -> str:
     sep = "&" if "?" in base else "?"
     return f"{base}{sep}flow={flow_key}"
 
+# =========================
+# OAuth 로그인
+# =========================
 
-# OAuth 제공자 로그인 URL 설정
 def get_oauth_login_url(provider: str) -> str | None:
     try:
         store = _flow_store()
@@ -78,7 +81,7 @@ def handle_oauth_callback() -> None:
     if not code and not error:
         return
 
-    # code는 일회용이다. rerun 때마다 재제출되지 않도록 URL에서 먼저 지운다.
+    # code는 일회용. rerun 때마다 재제출되지 않도록 URL에서 지움.
     st.query_params.clear()
 
     if error:
@@ -96,7 +99,7 @@ def handle_oauth_callback() -> None:
         return
     client = entry[0]
 
-    # 1) code -> session 교환 (verifier는 이 client가 기억하고 있다)
+    # code -> session 교환
     try:
         res = client.auth.exchange_code_for_session({"auth_code": code})
     except Exception as e:
@@ -107,7 +110,7 @@ def handle_oauth_callback() -> None:
         st.error("OAuth 사용자 정보를 가져오지 못했습니다.")
         return
 
-    # 2) public.users 저장 + 로그인 상태 설정 (교환 실패와 저장 실패를 구분해서 표시)
+    # public.users 저장 + 로그인 상태 설정
     try:
         _save_auth_user(res.user)
     except Exception as e:
@@ -116,50 +119,19 @@ def handle_oauth_callback() -> None:
 
     st.rerun()
 
+# =====================
+# 사용자 정보
+# =====================
 
-# 로그아웃
-def logout_user() -> None:
-    # 로그인 상태는 이 브라우저 세션(st.session_state)에만 있다.
-    st.session_state.user = None
-    st.session_state.user_id = None
-    st.session_state.logged_in = False
-    st.session_state.current_menu = "홈"
-    st.session_state.pop("oauth_flows", None)
-    st.rerun()
-
-
-# 로그인 유저 정보 불러오기
-def get_current_user_profile() -> dict | None:
-    user = st.session_state.get("user")
-
-    if not user:
-        return None
-
-    metadata = getattr(user, "user_metadata", {}) or {}
-
-    return {
-        "id": user.id,
-        "email": getattr(user, "email", "") or "",
-        "nickname": (
-            metadata.get("user_name")
-            or metadata.get("preferred_username")
-            or metadata.get("full_name")
-            or getattr(user, "email", "")
-        ),
-        "avatar_url": metadata.get("avatar_url") or metadata.get("picture", ""),
-        "github_url": metadata.get("preferred_username", ""),
-    }
-
-
-# 사용자를 public.users 테이블에 저장
+# 로그인 후 Supabase Auth 사용자 정보를 public.users 테이블에 저장하고 세션 상태를 설정합니다.
 def _save_auth_user(user, username: str | None = None) -> None:
     admin_supabase = get_supabase_admin_client()
     metadata = getattr(user, "user_metadata", {}) or {}
-
     email = getattr(user, "email", None) or ""
 
     display_name = (
         username
+        or metadata.get("username")
         or metadata.get("user_name")
         or metadata.get("preferred_username")
         or metadata.get("full_name")
@@ -167,6 +139,17 @@ def _save_auth_user(user, username: str | None = None) -> None:
         or email
         or str(user.id)
     )
+
+    # 탈퇴 처리된 계정 회원가입 방지
+    existing = (
+        admin_supabase.table("users")
+        .select("is_deleted")
+        .eq("id", str(user.id))
+        .limit(1)
+        .execute()
+    )
+    if existing.data and existing.data[0].get("is_deleted"):
+        raise ValueError("탈퇴 처리된 계정입니다.")
 
     admin_supabase.table("users").upsert(
         {
@@ -182,33 +165,144 @@ def _save_auth_user(user, username: str | None = None) -> None:
     st.session_state.current_menu = "홈"
 
 
-# 이메일로 로그인
+def get_current_user_profile() -> dict | None:
+    """현재 로그인한 사용자의 프로필 정보를 반환합니다."""
+    user = st.session_state.get("user")
+    if not user:
+        return None
+
+    metadata = getattr(user, "user_metadata", {}) or {}
+
+    return {
+        "id": user.id,
+        "email": getattr(user, "email", "") or "",
+        "nickname": (
+            metadata.get("username")
+            or metadata.get("user_name")
+            or metadata.get("preferred_username")
+            or metadata.get("full_name")
+            or getattr(user, "email", "")
+        ),
+        "avatar_url": metadata.get("avatar_url") or metadata.get("picture", ""),
+        "github_url": metadata.get("preferred_username", ""),
+    }
+
+# ==========================
+# 로그아웃 및 이메일 로그인
+# ===========================
+
+def logout_user() -> None:
+    """현재 Streamlit 세션의 로그인 상태를 초기화합니다."""
+    st.session_state.user = None
+    st.session_state.user_id = None
+    st.session_state.logged_in = False
+    st.session_state.current_menu = "홈"
+    st.session_state.pop("oauth_flows", None)
+    st.rerun()
+
+# 이메일 로그인 처리
 def login_with_email(email: str, password: str) -> bool:
     try:
         supabase = create_auth_client()
-
-        res = supabase.auth.sign_in_with_password(
+        response = supabase.auth.sign_in_with_password(
             {
                 "email": email.strip(),
                 "password": password,
             }
         )
 
-        if not res.user:
-            st.error("사용자 정보를 가져오지 못했습니다.")
+        if not response.user:
+            st.toast("사용자 정보를 가져오지 못했습니다.", icon="❌", duration="short")
             return False
 
-        _save_auth_user(res.user)
+        _save_auth_user(response.user)
         return True
 
     except Exception:
-        st.error(
-            "로그인에 실패했습니다. 이메일과 비밀번호를 확인해 주세요."
-        )
+        st.toast("로그인에 실패했습니다. 이메일과 비밀번호를 확인해 주세요.", icon="❌", duration="short")
         return False
 
+# =======================
+# 회원가입 유효성 검사
+# =======================
 
-# email로 회원가입
+# 비밀번호 유효성 검사: 영문과 숫자를 포함하여 6자리 이상
+def validate_password(password: str) -> bool:
+    pattern = r"^(?=.*[A-Za-z])(?=.*[0-9]).{6,}$"
+    return bool(re.fullmatch(pattern, password))
+
+# 닉네임 중복 여부 확인
+def is_nickname_available(nickname: str) -> bool:
+    normalized_nickname = nickname.strip()
+    if not normalized_nickname:
+        return False
+
+    admin_supabase = get_supabase_admin_client()
+    response = (
+        admin_supabase.table("users")
+        .select("id")
+        .ilike("username", normalized_nickname)
+        .limit(1)
+        .execute()
+    )
+    return not bool(response.data)
+
+
+# 회원가입 입력값 유효성 검사
+def validate_signup_inputs(
+    email: str,
+    password: str,
+    password_confirm: str,
+    nickname: str,
+) -> list[str]:
+    errors = []
+
+    email = email.strip()
+    nickname = nickname.strip()
+
+    if not email:
+        st.toast("이메일을 입력해주세요.", icon="❌", duration="short")
+
+    if not nickname:
+        st.toast("닉네임을 입력해주세요.", icon="❌", duration="short")
+
+    if not validate_password(password):
+        st.toast("비밀번호는 영문과 숫자를 포함하여 6자리 이상이어야 합니다.", icon="❌", duration="short")
+
+    if password != password_confirm:
+        errors.append("비밀번호가 일치하지 않습니다.")
+
+    if nickname:
+        try:
+            if not is_nickname_available(nickname):
+                st.toast("이미 사용 중인 닉네임입니다.", icon="❌", duration="short")
+        except Exception:
+            errors.append("닉네임 중복 여부를 확인하지 못했습니다. 잠시 후 다시 시도해주세요.")
+
+    return errors
+
+
+# 회원가입 오류 메시지 처리
+def _signup_error_message(error: Exception) -> str:
+        message = str(error).lower()
+
+        if any(
+            marker in message
+            for marker in (
+                "already registered",
+                "email_exists",
+                "user_already_exists",
+                "already been registered",
+            )
+        ):
+            return "이미 가입된 이메일입니다."
+
+        return (
+            "회원가입에 실패했습니다. 이메일 형식과 비밀번호를 확인해 주세요. "
+            f"(오류: {error})"
+        )
+
+# 이메일 회원가입 처리
 def signup_with_email(
     email: str,
     password: str,
@@ -216,37 +310,49 @@ def signup_with_email(
 ) -> bool:
     try:
         supabase = create_auth_client()
-        res = supabase.auth.sign_up(
+        nickname = username.strip()
+        if not is_nickname_available(nickname):
+            st.toast("이미 사용 중인 닉네임입니다.", icon="❌")
+            return False
+
+        response = supabase.auth.sign_up(
             {
                 "email": email.strip(),
                 "password": password,
                 "options": {
                     "data": {
-                        "username": username.strip(),
-                        "full_name": username.strip(),
+                        "username": nickname,
+                        "full_name": nickname,
                     }
                 },
             }
         )
 
-        if not res.session or not res.user:
+        # 이메일 인증이 활성화되어 있으면 session이 없는 상태로 반환될 수 있습니다.
+        if not response.user:
+            st.error("회원가입 결과를 확인할 수 없습니다.")
+            return False
+
+        if not response.session:
             st.success(
-                "회원가입 요청이 완료되었습니다. "
+                "회원가입 요청이 완료되었습니다. 이메일 인증이 필요한 경우 "
+                "메일함에서 인증을 완료한 후 로그인해 주세요."
             )
             return True
 
-        _save_auth_user(res.user, username.strip())
+        _save_auth_user(response.user, nickname)
         st.success("회원가입 및 로그인이 완료되었습니다.")
         return True
 
-    except Exception:
-        st.error(
-            "회원가입에 실패했습니다. 이메일 형식과 비밀번호를 "
-            "확인하거나 이미 가입된 계정인지 확인해 주세요."
-            "비밀번호는 6자리 이상, 문자와 숫자를 포함해야 합니다."
-        )
+    except Exception as e:
+        st.error(_signup_error_message(e))
         return False
 
+# ===============================
+# 이메일 로그인 / 회원가입 화면
+# ===============================
+
+# 이메일 로그인 및 회원가입 폼 랜더링
 def render_email_auth_form() -> None:
     st.markdown("---")
     st.subheader("이메일로 로그인")
@@ -255,85 +361,106 @@ def render_email_auth_form() -> None:
 
     with login_tab:
         with st.form("email_login_form"):
-            email = st.text_input(
+            login_email = st.text_input(
                 "이메일",
                 placeholder="example@domain.com",
                 key="email_login_email",
             )
-            password = st.text_input(
+            login_password = st.text_input(
                 "비밀번호",
                 type="password",
                 key="email_login_password",
             )
-            submitted = st.form_submit_button(
+            login_submitted = st.form_submit_button(
                 "로그인",
                 use_container_width=True,
                 type="primary",
             )
 
-        if submitted:
-            if not email.strip() or not password:
+        if login_submitted:
+            if not login_email.strip() or not login_password:
                 st.warning("이메일과 비밀번호를 입력해 주세요.")
-            elif login_with_email(email, password):
+            elif login_with_email(login_email, login_password):
                 st.rerun()
 
     with signup_tab:
         with st.form("email_signup_form"):
-            username = st.text_input(
+            signup_username = st.text_input(
                 "닉네임",
                 placeholder="사용할 닉네임",
                 key="email_signup_username",
             )
-            email = st.text_input(
+            signup_email = st.text_input(
                 "이메일",
                 placeholder="example@domain.com",
                 key="email_signup_email",
             )
-            password = st.text_input(
-                "비밀번호 (6자 이상)",
+            signup_password = st.text_input(
+                "비밀번호",
                 type="password",
+                placeholder="영문과 숫자를 포함하여 6자 이상",
                 key="email_signup_password",
             )
-            password_confirm = st.text_input(
+            signup_password_confirm = st.text_input(
                 "비밀번호 확인",
                 type="password",
                 key="email_signup_password_confirm",
             )
-            submitted = st.form_submit_button(
+            signup_submitted = st.form_submit_button(
                 "회원가입",
                 use_container_width=True,
                 type="primary",
             )
 
-        if submitted:
-            if not username.strip() or not email.strip():
-                st.warning("닉네임과 이메일을 입력해 주세요.")
-            elif len(password) < 6:
-                st.warning("비밀번호는 6자 이상 입력해 주세요.")
-            elif password != password_confirm:
-                st.warning("비밀번호가 일치하지 않습니다.")
+        if signup_submitted:
+            errors = validate_signup_inputs(
+                signup_email,
+                signup_password,
+                signup_password_confirm,
+                signup_username,
+            )
+
+            if errors:
+                for error in errors:
+                    st.error(error)
             else:
-                if signup_with_email(email, password, username):
+                if signup_with_email(
+                    signup_email,
+                    signup_password,
+                    signup_username,
+                ):
                     st.rerun()
 
-"""
+
+# ===========
 # 회원 탈퇴
-def delete_user(user_id: int | str) -> bool:
-    if user_id is None or (isinstance(user_id, str) and not user_id.strip()):
-        raise ValueError("유효한 사용자 ID가 필요합니다.")
+# ===========
+#1. 사용자 이름을 '탈퇴한 유저'로 변경
+#2. 탈퇴 여부와 탈퇴 일시 저장
+#3. 기존 북마크 삭제
+#4. Supabase Auth 계정 Soft Delete
+#게시글과 채팅 기록은 유지합니다.
 
-    try:
-        response = (
-            get_supabase_client()
-            .table("users")
-            .delete()
-            .eq("id", user_id)
-            .execute()
-        )
-    except Exception as exc:
-        raise DatabaseOperationError(
-            "회원 탈퇴에 실패했습니다. Supabase 연결과 테이블 설정을 확인해주세요."
-        ) from exc
+def delete_user(user_id: str) -> None:
+    if not user_id:
+        raise ValueError("사용자 ID가 없습니다.")
 
-    return bool(response.data)
-    """
+    supabase = get_supabase_admin_client()
+
+    # 사용자 프로필 탈퇴 유저로 변경
+    supabase.table("users").update({
+        "username": f"탈퇴한 유저_{str(user_id)[:8]}",
+        "is_deleted": True,
+        "deleted_at": datetime.now(timezone.utc).isoformat(),
+    }).eq("id", user_id).execute()
+
+    # 기존 북마크 삭제
+    supabase.table("bookmarks").delete().eq(
+        "user_id", user_id
+    ).execute()
+
+    # Supabase Auth 계정 Soft Delete
+    supabase.auth.admin.delete_user(
+        user_id,
+        should_soft_delete=True,
+    )
