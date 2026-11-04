@@ -43,19 +43,55 @@ def get_supabase_url() -> str:
     return url.rstrip("/")
 
 
-# 일반 Supabase 클라이언트 생성 및 캐싱
-@st.cache_resource
+# 일반 Supabase 클라이언트 생성
 def get_supabase_client() -> Client:
-    supabase_url = _get_secret("SUPABASE_URL")
-    supabase_key = _get_secret("SUPABASE_ANON_KEY")
-
-    if not supabase_url or not supabase_key:
-        raise DatabaseConfigurationError("Supabase URL 또는 ANON KEY가 설정되지 않았습니다.")
     try:
-        return create_client(supabase_url, supabase_key)
+        client = create_client(get_supabase_url(), _get_secret("SUPABASE_ANON_KEY"),)
+
+        access_token = st.session_state.get("supabase_access_token")
+        refresh_token = st.session_state.get("supabase_refresh_token")
+
+        if not access_token or not refresh_token:
+            raise DatabaseOperationError(
+                "로그인 세션이 없습니다. 다시 로그인해 주세요."
+            )
+
+        # 사용자 인증 세션 적용
+        session_response = client.auth.set_session(access_token, refresh_token)
+
+        # 갱신된 토큰 저장
+        if session_response and session_response.session:
+            st.session_state["supabase_access_token"] = (
+                session_response.session.access_token
+            )
+            st.session_state["supabase_refresh_token"] = (
+                session_response.session.refresh_token
+            )
+
+        # 실제 인증 사용자 확인
+        auth_response = client.auth.get_user()
+
+        if not auth_response.user:
+            raise DatabaseOperationError(
+                "사용자 인증 정보를 확인할 수 없습니다."
+            )
+
+        # 현재 로그인 사용자 ID와 인증 사용자 ID 비교
+        session_user_id = st.session_state.get("user_id")
+
+        if str(auth_response.user.id) != str(session_user_id):
+            raise DatabaseOperationError(
+                "로그인 사용자 정보가 일치하지 않습니다."
+            )
+
+        return client
+
+    except DatabaseOperationError:
+        raise
+
     except Exception as exc:
-        raise DatabaseConfigurationError(
-            f"Supabase 클라이언트 생성 실패: {exc}"
+        raise DatabaseOperationError(
+            f"Supabase 클라이언트 생성 또는 인증 실패: {exc}"
         ) from exc
 
 # 관리자용 Supabase 클라이언트 생성 및 캐싱
@@ -73,7 +109,7 @@ def get_supabase_admin_client() -> Client:
 
 # 로그인/회원가입 클라이언트 생성
 def create_auth_client() -> Client:
-    key = _get_secret("SUPABASE_ANON_KEY") or _get_secret("SUPABASE_KEY")
+    key = _get_secret("SUPABASE_ANON_KEY")
     if not key:
         raise DatabaseConfigurationError(
             "SUPABASE_ANON_KEY가 설정되지 않았습니다. .streamlit/secrets.toml을 확인해 주세요."
@@ -87,9 +123,9 @@ def create_auth_client() -> Client:
 # Supabase 연결 테스트 및 초기화
 #===========================
 def init_db() -> None:
-    client = get_supabase_client()
     try:
         # 간단한 핑/쿼리로 테이블 접근 가능 여부 테스트
+        client = get_supabase_client()
         _ = client.table("users").select("id").limit(1).execute()
     except Exception as exc:
         raise DatabaseOperationError(f"데이터베이스 연결 검증 실패: {exc}") from exc

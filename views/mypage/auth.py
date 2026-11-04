@@ -112,7 +112,7 @@ def handle_oauth_callback() -> None:
 
     # public.users 저장 + 로그인 상태 설정
     try:
-        _save_auth_user(res.user)
+        _save_auth_user(res.user, auth_session=res.session)
     except Exception as e:
         st.error(f"사용자 정보 저장 실패 (public.users 테이블/제약조건 확인): {e}")
         return
@@ -124,7 +124,16 @@ def handle_oauth_callback() -> None:
 # =====================
 
 # 로그인 후 Supabase Auth 사용자 정보를 public.users 테이블에 저장하고 세션 상태를 설정합니다.
-def _save_auth_user(user, username: str | None = None) -> None:
+def _save_auth_user(user, auth_session=None, username: str | None = None) -> None:
+    if auth_session is None:
+        raise ValueError("인증 세션이 없습니다.")
+
+    st.session_state["supabase_access_token"] = (
+        auth_session.access_token
+    )
+    st.session_state["supabase_refresh_token"] = (
+        auth_session.refresh_token
+    )
     admin_supabase = get_supabase_admin_client()
     metadata = getattr(user, "user_metadata", {}) or {}
     email = getattr(user, "email", None) or ""
@@ -197,6 +206,8 @@ def logout_user() -> None:
     st.session_state.logged_in = False
     st.session_state.current_menu = "홈"
     st.session_state.pop("oauth_flows", None)
+    st.session_state.pop("supabase_access_token", None)
+    st.session_state.pop("supabase_refresh_token", None)
     st.rerun()
 
 # 이메일 로그인 처리
@@ -214,7 +225,7 @@ def login_with_email(email: str, password: str) -> bool:
             st.toast("사용자 정보를 가져오지 못했습니다.", icon="❌", duration="short")
             return False
 
-        _save_auth_user(response.user)
+        _save_auth_user(response.user, auth_session=response.session)
         return True
 
     except Exception:
@@ -338,7 +349,7 @@ def signup_with_email(
             )
             return True
 
-        _save_auth_user(response.user, nickname)
+        _save_auth_user(response.user, auth_session=response.session, username=nickname)
         st.success("회원가입 및 로그인이 완료되었습니다.")
         return True
 

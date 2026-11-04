@@ -40,7 +40,6 @@ MIME_TYPES = {
 
 def upload_item_image(supabase, item_id, photo):
 
-    # 사진 확장자 확인
     ext = Path(photo["name"]).suffix.lower()
 
     if ext not in MIME_TYPES:
@@ -48,22 +47,22 @@ def upload_item_image(supabase, item_id, photo):
             "지원하지 않는 이미지 형식입니다. (jpg, jpeg, png)"
         )
 
-    # 파일별 고유 이름 생성
     image_path = f"{item_id}/{uuid4().hex}{ext}"
-
     bucket = supabase.storage.from_(IMAGE_BUCKET)
+    storage_uploaded = False
 
-    # 1. 실제 사진을 Storage에 업로드
-    bucket.upload(
-        path=image_path,
-        file=photo["bytes"],
-        file_options={
-            "content-type": MIME_TYPES[ext]
-        },
-    )
-
-    # 2. 업로드한 사진의 경로를 DB에 저장
     try:
+        # 1. Storage에 사진 업로드
+        bucket.upload(
+            path=image_path,
+            file=photo["bytes"],
+            file_options={
+                "content-type": MIME_TYPES[ext]
+            },
+        )
+        storage_uploaded = True
+
+        # 2. 이미지 경로를 DB에 저장
         response = (
             supabase.table("lost_item_images")
             .insert({
@@ -78,12 +77,21 @@ def upload_item_image(supabase, item_id, photo):
                 "사진 경로 저장 결과를 확인하지 못했습니다."
             )
 
+        return image_path
+
     except Exception:
-        # DB 저장 실패 시 Storage에 업로드한 사진 삭제
-        bucket.remove([image_path])
+        # DB 저장 실패 시 Storage에 업로드한 사진 정리
+        if storage_uploaded:
+            try:
+                bucket.remove([image_path])
+            except Exception as cleanup_error:
+                st.warning(
+                    f"업로드된 사진 정리에 실패했습니다: {cleanup_error}"
+                )
+
         raise
 
-    return image_path
+
 
 
 # ==========================================
@@ -98,10 +106,9 @@ def save_register_item(
     item_date,
     description,
     user_id,
-    tags
+    tags,
+    supabase
 ):
-
-    supabase = get_supabase_client()
 
     # 등록 유형을 DB 상태 값으로 변환
     status = {
@@ -109,7 +116,6 @@ def save_register_item(
         "습득물": "습득"
     }[item_type]
 
-    # Supabase에 저장할 게시글 정보
     item_data = {
         "title": title.strip(),
         "status": status,
@@ -141,7 +147,6 @@ def save_register_item(
 
 def add_tag():
 
-    # 현재 등록 폼의 태그 입력창 key 확인
     version = st.session_state.get(
         "register_form_version", 0
     )
@@ -160,11 +165,9 @@ def add_tag():
 
     tags = st.session_state.register_tags
 
-    # 중복 방지 및 최대 10개 제한
     if value not in tags and len(tags) < 10:
         tags.append(value)
 
-    # 태그 입력창 초기화
     st.session_state[input_key] = ""
 
 
@@ -196,7 +199,6 @@ def photo_changed():
             "bytes": photo.getvalue()
         }
 
-    # 사진 선택 후 업로더 초기화
     st.session_state.register_picker_version += 1
 
 
@@ -213,28 +215,19 @@ def remove_photo(photo_id):
 
 def clear_register_state():
 
-    # 등록 폼 버전이 없으면 먼저 생성
-    # PR 리뷰에서 지적된 KeyError 방지
     if "register_form_version" not in st.session_state:
         st.session_state["register_form_version"] = 0
 
-    # 새로운 입력 폼 생성
     st.session_state["register_form_version"] += 1
 
-    # 태그와 사진 목록 초기화
     st.session_state["register_tags"] = []
     st.session_state["register_photos"] = {}
 
-    # 사진 업로더 버전이 없으면 먼저 생성
-    # PR 리뷰에서 지적된 KeyError 방지
     if "register_picker_version" not in st.session_state:
         st.session_state["register_picker_version"] = 0
 
-    # 새로운 사진 업로더 생성
     st.session_state["register_picker_version"] += 1
 
-    # 이전 폼의 위젯 상태 정리
-    # 로그인 관련 세션 상태는 건드리지 않음
     keep = {
         "register_form_version",
         "register_tags",
@@ -297,7 +290,6 @@ def render_register():
             duration="short"
         )
 
-    # 현재 입력 폼 버전
     form_version = (
         st.session_state.register_form_version
     )
@@ -355,7 +347,6 @@ def render_register():
                     "선택 사항 · 여러 장 등록 가능"
                 )
 
-                # 업로드 영역
                 with st.container(
                     key="register_uploader"
                 ):
@@ -423,7 +414,6 @@ def render_register():
 
             with info_col:
 
-                # 게시글 제목
                 st.markdown(
                     '<div class="register-label">'
                     '게시글 제목'
@@ -441,7 +431,6 @@ def render_register():
                     key=f"register_title_{form_version}"
                 )
 
-                # 등록 유형
                 st.markdown(
                     '<div class="register-label">'
                     '등록 유형'
@@ -462,10 +451,6 @@ def render_register():
                     filter_mode=None
                 )
 
-                # ==============================
-                # 물품 카테고리
-                # ==============================
-
                 st.markdown(
                     '<div class="register-label">'
                     '물품 카테고리'
@@ -482,7 +467,6 @@ def render_register():
                     filter_mode=None
                 )
 
-                # 분실 / 습득 장소
                 st.markdown(
                     '<div class="register-label">'
                     '분실 / 습득 장소'
@@ -498,7 +482,6 @@ def render_register():
                     key=f"register_location_{form_version}"
                 )
 
-                # 분실 / 습득 날짜
                 st.markdown(
                     '<div class="register-label">'
                     '분실 / 습득 날짜'
@@ -594,7 +577,7 @@ def render_register():
                 submitted = st.button(
                     "물품 등록하기",
                     type="primary",
-                    use_container_width=True
+                    width="stretch"
                 )
 
             # ==============================
@@ -655,7 +638,13 @@ def render_register():
                         try:
 
                             # ==========================
-                            # 1. 게시글 기본 정보 저장
+                            # 1. 인증 클라이언트 생성
+                            # ==========================
+
+                            supabase = get_supabase_client()
+
+                            # ==========================
+                            # 2. 게시글 기본 정보 저장
                             # ==========================
 
                             saved_item = save_register_item(
@@ -666,18 +655,11 @@ def render_register():
                                 item_date=item_date,
                                 description=description,
                                 user_id=user_id,
-                                tags=tags
+                                tags=tags,
+                                supabase=supabase
                             )
 
                             item_id = saved_item["id"]
-
-                            # ==========================
-                            # 2. Supabase 연결
-                            # ==========================
-
-                            supabase = (
-                                get_supabase_client()
-                            )
 
                             # ==========================
                             # 3. 사진 저장
@@ -723,15 +705,12 @@ def render_register():
                             # 4. 등록 성공
                             # ==========================
 
-                            # 완료 알림 표시 예약
                             st.session_state[
                                 "registration_success"
                             ] = True
 
-                            # 전체 입력값 초기화 예약
                             st.session_state[
                                 "registration_reset_pending"
                             ] = True
 
-                            # 화면 다시 실행
                             st.rerun()
