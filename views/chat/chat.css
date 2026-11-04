@@ -1,0 +1,136 @@
+
+/* ==========================================
+    1. 채팅방 목록 버튼
+========================================== */
+
+/* 버튼 내부 div 왼쪽 정렬 */
+[class*="st-key-chat_room_"] button > div {
+    width: 100%;
+    justify-content: flex-start;
+    align-items: flex-start;
+    text-align: left;
+}
+
+/* Markdown 영역 왼쪽 정렬 */
+[class*="st-key-chat_room_"] [data-testid="stMarkdownContainer"] {
+    width: 100%;
+    text-align: left;
+}
+
+/* 채팅방 버튼에 마우스를 올렸을 때 */
+[class*="st-key-chat_room_"] button:hover {
+    background-color: #E2EBFB;
+    border-color: #bfc5cc;
+}
+
+/* 버튼 클릭 시 */
+[class*="st-key-chat_room_"] button:active {
+    background-color: #eef2f6;
+}
+
+/* 키보드로 선택했을 때 */
+[class*="st-key-chat_room_"] button:focus-visible {
+    outline: 2px solid #4a90e2;
+    outline-offset: 2px;
+}
+
+/* ==========================================
+    2. 채팅방 내부 메시지
+========================================== */
+
+/* 메시지 + 시간을 묶는 전체 영역 */
+[class*="st-key-chat-msg-"] {
+    width: fit-content;
+    max-width: 75%;
+    margin-bottom: 18px;
+}
+
+/* 상대방 메시지 - 왼쪽 */
+[class*="st-key-chat-msg-other-"] {
+    margin-left: 0;
+    margin-right: auto;
+}
+
+/* 내 메시지 - 오른쪽 */
+[class*="st-key-chat-msg-me-"] {
+    margin-left: auto;
+    margin-right: 0;
+}
+
+/* 실제 말풍선 */
+[class*="st-key-bubble-"] {
+    padding: 14px 18px 27px 18px;
+    border-radius: 16px;
+    overflow-wrap: anywhere;
+}
+
+/* 상대방 말풍선 색상 */
+[class*="st-key-chat-msg-other-"] [class*="st-key-bubble-"] {
+    background-color: #E2EBFB;
+    border-top-left-radius: 3px;
+}
+
+/* 내 말풍선 색상 */
+[class*="st-key-chat-msg-me-"] [class*="st-key-bubble-"] {
+    background-color: #3168D5;
+    color:#ffffff;
+    border-top-right-radius: 3px;
+}
+
+/* 메시지 내용 */
+[class*="st-key-bubble-"] p {
+    margin: 0;
+    text-align: left;
+    line-height: 1.5;
+}
+
+/* 말풍선 밖 시간 */
+[class*="st-key-chat-msg-"] [data-testid="stCaptionContainer"] {
+    font-size: 11px;
+    color: #999999;
+    margin-top: 2px;
+}
+
+/* 상대방 시간 - 왼쪽 */
+[class*="st-key-chat-msg-other-"] [data-testid="stCaptionContainer"] {
+    text-align: left;
+}
+
+/* 내 시간 - 오른쪽 */
+[class*="st-key-chat-msg-me-"] [data-testid="stCaptionContainer"] {
+    text-align: right;
+}
+
+
+/* ==========================================
+    3. 채팅 입력창
+========================================== */
+
+/* 채팅 입력창 모서리 */
+[data-testid="stChatInput"] {
+    border-radius: 12px;
+}
+
+/* 입력창 내부 글자 */
+[data-testid="stChatInput"] textarea {
+    font-size: 14px;
+}
+
+
+/* ==========================================
+    4. 모바일 화면 대응
+========================================== */
+
+@media (max-width: 768px) {
+
+    /* 채팅방 버튼 여백 */
+    [class*="st-key-chat_room_"] button {
+        padding: 12px 14px;
+        min-height: 75px;
+    }
+
+    /* 채팅 말풍선 최대 너비 */
+    [class*="st-key-chat-msg-"] {
+        max-width: 85%;
+    }
+}
