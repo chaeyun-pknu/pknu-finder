@@ -124,11 +124,14 @@ def create_auth_client() -> Client:
 #===========================
 def init_db() -> None:
     try:
-        # 간단한 핑/쿼리로 테이블 접근 가능 여부 테스트
-        client = get_supabase_client()
-        _ = client.table("users").select("id").limit(1).execute()
+        # 로그인 전에도 Supabase 설정을 확인할 수 있도록
+        # 사용자 인증 세션이 필요 없는 클라이언트 생성
+        create_auth_client()
+
     except Exception as exc:
-        raise DatabaseOperationError(f"데이터베이스 연결 검증 실패: {exc}") from exc
+        raise DatabaseOperationError(
+            f"Supabase 초기화 실패: {exc}"
+        ) from exc
 
 #=========================
 # 사용자 정보 조회

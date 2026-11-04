@@ -62,6 +62,8 @@ def initialize_session_state() -> None:
         "user_id": None,
         "user": None,
         "current_menu": "홈",
+        "supabase_access_token": None,
+        "supabase_refresh_token": None,
     }
 
     for key, value in defaults.items():
