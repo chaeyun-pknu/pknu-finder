@@ -33,15 +33,15 @@ from views.chat.chat import render_chat
 
 st.set_page_config(
     page_title="PKNU Finder",
-    page_icon="docs/images/pknufinder_logo.png",
+    page_icon="docs/images/pknufinderlogo.svg",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 
-# ==========================================
+# =======
 # 메뉴
-# ==========================================
+# =======
 
 MENU_OPTIONS = [
     "홈",
@@ -147,7 +147,8 @@ def render_selected_page(menu: str) -> None:
 # ==========================================
 
 def render_app() -> None:
-
+    
+    # 사이드바 메뉴
     st.sidebar.title("PKNU Finder")
     st.sidebar.markdown("---")
 

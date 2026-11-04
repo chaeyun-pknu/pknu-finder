@@ -17,21 +17,21 @@ def _get_redirect_url() -> str:
     except Exception:
         return default_url
 
-
+# OAuth 로그인 흐름 저장소 및 만료 처리
 _FLOW_TTL_SEC = 60 * 60
 @st.cache_resource
 def _flow_store() -> dict:
     """flow_key -> (client, login_url, 생성 시각). 서버 프로세스 메모리에 보관."""
     return {}
 
-
+# flow store에서 만료된 항목 제거
 def _prune_flows(store: dict) -> None:
     now = time.time()
     for key, (_, _, created) in list(store.items()):
         if now - created > _FLOW_TTL_SEC:
             store.pop(key, None)
 
-
+# OAuth 로그인 리다이렉트 URL 생성
 def _build_redirect_url(flow_key: str) -> str:
     base = _get_redirect_url()
     sep = "&" if "?" in base else "?"
@@ -164,9 +164,8 @@ def _save_auth_user(user, username: str | None = None) -> None:
     st.session_state.logged_in = True
     st.session_state.current_menu = "홈"
 
-
+# 로그인한 사용자 프로필 반환
 def get_current_user_profile() -> dict | None:
-    """현재 로그인한 사용자의 프로필 정보를 반환합니다."""
     user = st.session_state.get("user")
     if not user:
         return None
@@ -191,8 +190,8 @@ def get_current_user_profile() -> dict | None:
 # 로그아웃 및 이메일 로그인
 # ===========================
 
+# 세션 로그인 상태 초기화 = 로그아웃
 def logout_user() -> None:
-    """현재 Streamlit 세션의 로그인 상태를 초기화합니다."""
     st.session_state.user = None
     st.session_state.user_id = None
     st.session_state.logged_in = False
@@ -335,8 +334,7 @@ def signup_with_email(
 
         if not response.session:
             st.success(
-                "회원가입 요청이 완료되었습니다. 이메일 인증이 필요한 경우 "
-                "메일함에서 인증을 완료한 후 로그인해 주세요."
+                "회원가입 요청이 완료되었습니다."
             )
             return True
 
