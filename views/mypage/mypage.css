@@ -1,0 +1,76 @@
+/* 마이페이지 전체 */
+.st-key-mypage_page {
+    color: #17243A;
+}
+
+/* 상단 소개 */
+.st-key-mypage_page .mypage-header {
+    margin-bottom: 24px;
+}
+
+.st-key-mypage_page .mypage-eyebrow {
+    color: #2563EB;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    margin-bottom: 6px;
+}
+
+.st-key-mypage_page h1 {
+    color: #17243A;
+    font-weight: 800;
+    margin-bottom: 6px;
+}
+
+.st-key-mypage_page [data-testid="stCaptionContainer"] {
+    color: #64748B;
+}
+
+/* 마이페이지 카드 */
+.st-key-mypage_page .mypage-card {
+    background: #FFFFFF;
+    border: 1px solid #E5EAF3;
+    border-radius: 20px;
+    padding: 24px;
+    margin: 14px 0 20px;
+    box-shadow: 0 8px 28px rgba(29,62,108,0.06);
+}
+
+/* 카드 내부 제목 */
+.st-key-mypage_page h2,
+.st-key-mypage_page h3 {
+    color: #17243A;
+    font-weight: 750;
+}
+
+/* 로그인 상태 / 안내 문구 */
+.st-key-mypage_page [data-testid="stAlert"] {
+    border-radius: 12px;
+}
+
+/* 체크박스 */
+.st-key-mypage_page [data-testid="stCheckbox"] {
+    padding: 10px 12px;
+    background: #F8FAFD;
+    border: 1px solid #DFE6F0;
+    border-radius: 11px;
+}
+
+/* 회원 탈퇴 버튼 */
+.st-key-mypage_page .stButton button {
+    border-radius: 10px;
+    font-weight: 700;
+    min-height: 42px;
+}
+
+/* 기본 버튼 */
+.st-key-mypage_page .stButton button[kind="secondary"] {
+    color: #334155;
+    border: 1px solid #DFE6F0;
+    background: #FFFFFF;
+}
+
+/* 구분선 */
+.st-key-mypage_page hr {
+    border-color: #E5EAF3;
+}

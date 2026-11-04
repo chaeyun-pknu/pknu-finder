@@ -1,0 +1,146 @@
+/* 홈 화면 전체 */
+.st-key-home_page {
+    color: #17243A;
+}
+
+/* 상단 메인 소개 영역 */
+.st-key-home_hero {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(120deg, #F1F6FF 0%, #FFFFFF 52%, #EEF4FF 100%);
+    border: 1px solid #E3EBFA;
+    border-radius: 26px;
+    padding: 48px 32px 34px;
+    margin: 8px 0 28px;
+    box-shadow: 0 8px 28px rgba(29, 62, 108, 0.06);
+}
+
+/* 배경 장식 원 */
+.st-key-home_hero::before,
+.st-key-home_hero::after {
+    content: "";
+    position: absolute;
+    width: 210px;
+    height: 210px;
+    border-radius: 50%;
+    background: rgba(219, 232, 255, 0.45);
+    pointer-events: none;
+}
+
+.st-key-home_hero::before {
+    top: -105px;
+    left: -95px;
+}
+
+.st-key-home_hero::after {
+    right: -105px;
+    bottom: -125px;
+}
+
+/* 로고 가운데 정렬 */
+.st-key-home_hero [data-testid="stImage"] {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0 auto 14px;
+}
+
+.st-key-home_hero [data-testid="stImage"] img {
+    display: block;
+    width: 180px !important;
+    max-width: 100% !important;
+    height: auto;
+    margin: 0 auto;
+    object-fit: contain;
+}
+
+/* 소개 문구 */
+.st-key-home_hero .home-intro {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+}
+
+.st-key-home_hero .home-subtitle {
+    color: #263A57;
+    font-size: 20px;
+    font-weight: 700;
+    margin: 12px 0 10px;
+}
+
+.st-key-home_hero .home-description {
+    color: #64748B;
+    font-size: 14px;
+    margin: 0;
+}
+
+/* 최근 게시글 카드 영역 */
+.st-key-home_section {
+    background: #FFFFFF;
+    border: 1px solid #E1E9F5;
+    border-radius: 20px;
+    padding: 24px 28px 28px;
+    margin-top: 28px;
+    box-shadow: 0 8px 24px rgba(29, 62, 108, 0.05);
+}
+
+/* 최근 게시글 제목 */
+.st-key-home_section .home-section-title {
+    color: #17243A;
+    font-size: 25px;
+    font-weight: 800;
+    margin: 0 0 14px;
+}
+
+/* 제목 아래 구분선 */
+.st-key-home_section .home-section-divider {
+    height: 1px;
+    width: 100%;
+    background: #E1E9F5;
+    margin-bottom: 24px;
+}
+
+/* 게시글 카드 자리 */
+.st-key-home_section [class*="st-key-home_post_"] {
+    min-height: 150px;
+    background: linear-gradient(135deg, #F7FAFF, #F1F6FF);
+    border: 1px solid #CFE0FF;
+    border-radius: 20px;
+    padding: 12px;
+    margin-bottom: 6px;
+    transition: 0.2s ease;
+}
+
+.st-key-home_section [class*="st-key-home_post_"]:hover {
+    border-color: #93B8F5;
+    box-shadow: 0 5px 16px rgba(37, 99, 235, 0.08);
+}
+
+/* 구분선 기본 스타일 */
+.st-key-home_page hr {
+    border-color: #E3EBF7;
+}
+
+/* 작은 화면 */
+@media (max-width: 700px) {
+    .st-key-home_hero {
+        padding: 32px 18px 26px;
+    }
+
+    .st-key-home_hero .home-subtitle {
+        font-size: 18px;
+    }
+
+    .st-key-home_hero .home-description {
+        font-size: 14px;
+    }
+
+    .st-key-home_section {
+        padding: 18px;
+    }
+
+    .st-key-home_section .home-section-title {
+        font-size: 21px;
+    }
+}
