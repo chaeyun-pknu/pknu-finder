@@ -124,9 +124,7 @@ python -m streamlit run main.py --server.port 8501
 현재 회원 탈퇴는 계정과 프로필을 즉시 물리적으로 삭제하는 대신 비활성화하는 방식으로 처리합니다.
 
 - `users` 테이블의 사용자 이름은 `탈퇴한 유저_사용자ID일부` 형식으로 변경됩니다.
-- `is_deleted`와 `deleted_at`에 탈퇴 상태 및 시각을 기록합니다. Supabase Auth 계정은 Soft Delete 방식으로 처리됩니다.
-- 기존 게시글은 유지됩니다.
-- 기존 북마크는 삭제됩니다.
+- `is_deleted`와 `deleted_at`에 탈퇴 상태 및 시각을 기록합니다.
 - Supabase Auth 계정은 Soft Delete 방식으로 처리됩니다.
 
 ## Supabase 프로젝트 설정
