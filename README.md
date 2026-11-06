@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/pknufinder_logo.png" alt="PKNU Finder 로고" width="120">
+  <img src="docs/images/pknufinderlogo_text.svg" alt="PKNU Finder 로고" width="120">
 </p>
 
 <h1 align="center">PKNU Finder</h1>
@@ -25,11 +25,11 @@
 |---|---|---|---|
 | 로그인 / 회원가입 | 구현 | 이메일·비밀번호 로그인 및 회원가입, Google·GitHub OAuth 로그인 연결 | 이민범 |
 | 로그아웃 | 구현 | 현재 로그인 세션 종료 | 이민범 |
-| 회원 탈퇴 | 구현 | 계정 비활성화(Soft Delete), 게시글 작성자 표시 변경 및 기존 북마크 정리 | 이민범 |
+| 회원 탈퇴 | 일부 구현 | 계정 비활성화(Soft Delete), 탈퇴 유저명 변경(탈퇴한 유저_xxx..) 구현, 북마크, 게시글, 채팅 등 사용자 데이터 삭제 기능 구현 예정 | 이민범 |
 | 분실물 / 습득물 등록 | 구현 | 유형, 제목, 카테고리, 장소, 날짜, 설명, 태그 및 사진 등록 | 윤한희 |
 | 분실물 / 습득물 검색 | 기본 기능 구현 | 키워드 검색 및 전체·분실물·습득물 유형 필터링 | 박유진 |
 | 마이페이지 북마크 | 준비 중 | 관심 게시글 저장 및 조회 | 이민범 |
-| 채팅 | 준비 중 | 게시글을 기준으로 한 사용자 간 1:1 채팅 | 김채윤 |
+| 채팅 | 일부 구현 | 사용자의 채팅 목록, 채팅방 UI 구현, DB연동 진행 전이라 더미데이터로 일부 구현 / DB 연동 후 메세지 전송, 수신 기능 및 저장기능 구현 예정 | 김채윤 |
 
 ※ 소셜 로그인은 Supabase 대시보드에서 해당 Provider와 OAuth 정보를 설정해야 사용할 수 있습니다. 검색은 현재 제목·설명·카테고리 키워드를 기준으로 동작합니다.
 
@@ -125,8 +125,6 @@ python -m streamlit run main.py --server.port 8501
 
 - `users` 테이블의 사용자 이름은 `탈퇴한 유저_사용자ID일부` 형식으로 변경됩니다.
 - `is_deleted`와 `deleted_at`에 탈퇴 상태 및 시각을 기록합니다.
-- 기존 게시글은 유지됩니다.
-- 기존 북마크는 삭제됩니다.
 - Supabase Auth 계정은 Soft Delete 방식으로 처리됩니다.
 
 ## Supabase 프로젝트 설정
@@ -199,7 +197,8 @@ pknu-finder/
 │   │   ├── search.py
 │   │   └── search_service.py
 │   ├── chat/
-│   │   └── chat.py
+│   │   ├── chat.py
+|   |   └── chat.css
 │   └── mypage/
 │       ├── auth.py
 │       ├── mypage.py
