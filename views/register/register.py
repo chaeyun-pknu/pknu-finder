@@ -3,6 +3,7 @@ import streamlit as st
 from pathlib import Path
 from datetime import date
 from uuid import uuid4
+from hashlib import sha256
 
 
 # ==========================================
@@ -43,6 +44,14 @@ ITEM_LOCATIONS = [
 # ==========================================
 
 IMAGE_BUCKET = "lost-item-images"
+
+# 등록 화면 입력 제한 (필요하면 이 숫자만 변경)
+MAX_PHOTOS = 10
+MAX_PHOTO_BYTES = 5 * 1024 * 1024  # 사진 한 장당 5MB
+MAX_TAGS = 15
+MAX_TAG_LENGTH = 20
+MAX_TITLE_LENGTH = 60
+MAX_DESCRIPTION_LENGTH = 1000
 
 MIME_TYPES = {
     ".jpg": "image/jpeg",
@@ -172,13 +181,27 @@ def add_tag():
         .strip()
     )
 
+    # 이전 안내 문구를 새 입력 결과로 갱신
+    st.session_state["register_tag_feedback"] = ""
+
     if not value:
         return
 
     tags = st.session_state.register_tags
 
-    # 중복 방지 및 최대 10개 제한
-    if value not in tags and len(tags) < 10:
+    if len(value) > MAX_TAG_LENGTH:
+        st.session_state["register_tag_feedback"] = (
+            f"태그는 {MAX_TAG_LENGTH}자 이내로 입력해 주세요."
+        )
+    elif any(tag.casefold() == value.casefold() for tag in tags):
+        st.session_state["register_tag_feedback"] = (
+            "이미 추가한 태그입니다."
+        )
+    elif len(tags) >= MAX_TAGS:
+        st.session_state["register_tag_feedback"] = (
+            f"태그는 최대 {MAX_TAGS}개까지 추가할 수 있습니다."
+        )
+    else:
         tags.append(value)
 
     # 태그 입력창 초기화
@@ -204,14 +227,39 @@ def photo_changed():
         st.session_state.get(picker_key) or []
     )
 
+    photos = st.session_state.register_photos
+    # 사용자에게 보여줄 업로드 검증 메시지
+    feedback = []
+    existing_hashes = {
+        sha256(saved["bytes"]).hexdigest()
+        for saved in photos.values()
+    }
+
     for photo in uploaded_files:
+        # 허용 장수를 초과한 사진은 추가하지 않음
+        if len(photos) >= MAX_PHOTOS:
+            feedback.append(f"사진은 최대 {MAX_PHOTOS}장까지 등록할 수 있습니다.")
+            break
+
+        contents = photo.getvalue()
+        if len(contents) > MAX_PHOTO_BYTES:
+            feedback.append(f"{photo.name}: 사진 한 장은 5MB 이하여야 합니다.")
+            continue
+
+        # 파일 이름이 달라도 내용이 동일한 사진이면 중복으로 처리
+        photo_hash = sha256(contents).hexdigest()
+        if photo_hash in existing_hashes:
+            feedback.append(f"{photo.name}: 이미 추가한 사진입니다.")
+            continue
 
         photo_id = uuid4().hex
-
-        st.session_state.register_photos[photo_id] = {
+        photos[photo_id] = {
             "name": photo.name,
-            "bytes": photo.getvalue()
+            "bytes": contents
         }
+        existing_hashes.add(photo_hash)
+
+    st.session_state["register_photo_feedback"] = list(dict.fromkeys(feedback))
 
     # 사진 선택 후 업로더 초기화
     st.session_state.register_picker_version += 1
@@ -369,7 +417,7 @@ def render_register():
                 )
 
                 st.caption(
-                    "선택 사항 · 여러 장 등록 가능"
+                    f"선택 사항 · 최대 {MAX_PHOTOS}장 · 사진당 5MB 이하"
                 )
 
                 # 업로드 영역
@@ -386,10 +434,16 @@ def render_register():
                         "사진 업로드",
                         type=["jpg", "jpeg", "png"],
                         accept_multiple_files=True,
+                        max_upload_size=5,
                         key=picker_key,
                         on_change=photo_changed,
                         label_visibility="collapsed"
                     )
+
+                for message in st.session_state.get(
+                    "register_photo_feedback", []
+                ):
+                    st.warning(message)
 
                 # 사진 미리보기
                 photos = (
@@ -454,9 +508,11 @@ def render_register():
                     placeholder=(
                         "예) 중앙도서관에서 지갑을 잃어버렸어요"
                     ),
+                    max_chars=MAX_TITLE_LENGTH,
                     label_visibility="collapsed",
                     key=f"register_title_{form_version}"
                 )
+                st.caption(f"{len(title)}/{MAX_TITLE_LENGTH}자")
 
                 # 등록 유형
                 st.markdown(
@@ -548,7 +604,8 @@ def render_register():
             st.markdown("#### 관련 태그")
 
             st.caption(
-                "단어를 입력하고 Enter를 누르면 추가됩니다."
+                f"태그는 최대 {MAX_TAGS}개, 태그당 {MAX_TAG_LENGTH}자까지 "
+                "입력할 수 있습니다. Enter를 눌러 추가해 주세요."
             )
 
             st.text_input(
@@ -560,6 +617,9 @@ def render_register():
             )
 
             tags = st.session_state.register_tags
+            st.caption(f"등록된 태그: {len(tags)}/{MAX_TAGS}개")
+            if st.session_state.get("register_tag_feedback"):
+                st.warning(st.session_state["register_tag_feedback"])
 
             with st.container(
                 key="register_tags"
@@ -601,9 +661,11 @@ def render_register():
                     "자세히 작성해 주세요."
                 ),
                 height=200,
+                max_chars=MAX_DESCRIPTION_LENGTH,
                 label_visibility="collapsed",
                 key=f"register_description_{form_version}"
             )
+            st.caption(f"{len(description)}/{MAX_DESCRIPTION_LENGTH}자")
 
             st.write("")
 
@@ -633,6 +695,10 @@ def render_register():
                         "게시글 제목을 입력해 주세요."
                     )
 
+                elif len(title) > MAX_TITLE_LENGTH:
+
+                    st.warning(f"게시글 제목은 {MAX_TITLE_LENGTH}자 이내로 입력해 주세요.")
+
                 elif item_type == "선택해 주세요":
 
                     st.warning(
@@ -656,6 +722,10 @@ def render_register():
                     st.warning(
                         "상세 설명을 입력해 주세요."
                     )
+
+                elif len(description) > MAX_DESCRIPTION_LENGTH:
+
+                    st.warning(f"상세 설명은 {MAX_DESCRIPTION_LENGTH}자 이내로 입력해 주세요.")
 
                 else:
 
