@@ -1,5 +1,7 @@
 import streamlit as st
 from DB.database import get_supabase_client
+from io import BytesIO
+from PIL import Image, ImageOps
 
 #=========================
 # 북마크 등록
@@ -116,7 +118,7 @@ def render_bookmarks():
 
         images = image_response.data or []
 
-        # 게시글별 대표 이미지 하나씩 저장
+        # 게시글별 대표 이미지 저장
         image_map = {}
 
         for image in images:
@@ -126,7 +128,9 @@ def render_bookmarks():
                 image_map[item_id] = image["image_path"]
 
         # 4. 북마크 목록 출력
-        for item_id in item_ids:
+        cols = st.columns(3)
+
+        for index, item_id in enumerate(item_ids):
             item = item_map.get(item_id)
 
             if item is None:
@@ -135,67 +139,85 @@ def render_bookmarks():
             title = item.get("title") or "제목 없음"
             status = item.get("status") or "미분류"
             category = item.get("category") or "미입력"
-            location = item.get("location") or "미입력"
-            lost_date = item.get("lost_date") or "미입력"
+            location = item.get("location") or "장소 미입력"
+            lost_date = item.get("lost_date") or "날짜 미입력"
 
-            st.divider()
+            # 3개씩 한 줄에 배치
+            with cols[index % 3]:
+                with st.container(border=True):
 
-            col1, col2, col3 = st.columns([1, 3, 0.4])
+                    # 이미지
+                    image_path = image_map.get(item_id)
 
-            with col1:
-                image_path = image_map.get(item_id)
+                    if image_path:
+                        try:
+                            image_data = (
+                                supabase.storage
+                                .from_("lost-item-images")
+                                .download(image_path)
+                            )
 
-                if image_path:
-                    try:
-                        signed_response = (
-                            supabase.storage
-                            .from_("lost-item-images")
-                            .create_signed_url(image_path, 3600)
-                        )
+                            original_image = Image.open(
+                                BytesIO(image_data)
+                            ).convert("RGB")
 
-                        image_url = (
-                            signed_response.get("signedURL")
-                            or signed_response.get("signedUrl")
-                        )
+                            thumbnail = ImageOps.fit(
+                                original_image,
+                                (200, 200),
+                                method=Image.Resampling.LANCZOS,
+                                centering=(0.5, 0.5)
+                            )
 
-                        if image_url:
-                            st.image(image_url, width=140)
-                        else:
-                            st.caption("이미지를 불러올 수 없습니다.")
+                            st.image(thumbnail, width="stretch")
 
-                    except Exception as e:
-                        print(f"이미지 조회 오류: {e}")
-                        st.caption("이미지를 불러올 수 없습니다.")
-                else:
-                    st.caption("등록된 이미지가 없습니다.")
+                        except Exception as e:
+                            print(f"이미지 로드 오류: {e}")
+                            st.warning("이미지를 불러오는 중 오류가 발생했습니다.")
 
-            with col2:
-                st.markdown(f"### {title}")
-                st.write(f"**분류:** {status},  **카테고리:** {category}")
-                st.write(f"**분실 날짜:** {lost_date},  **장소**: {location}")
+                    # 제목
+                    st.markdown(f"**{title}**")
 
-                if st.button("상세보기", key=f"bookmark_detail_{item_id}"):
-                    st.session_state["selected_item_id"] = item_id
-                    st.session_state["current_menu"] = "게시글 상세보기"
-                    st.rerun()
+                    # 게시글 정보
+                    st.caption(f"📁 {status} · {category}")
+                    st.caption(f"📍 {location}")
+                    st.caption(f"📅 {lost_date}")
 
-            with col3:
-                if st.button("❤️", key=f"remove_bookmark_{item_id}"):
-                    try:
-                        (
-                            supabase.table("bookmarks")
-                            .delete()
-                            .eq("user_id", str(current_user.id))
-                            .eq("item_id", item_id)
-                            .execute()
-                        )
+                    # 상세보기 / 북마크 삭제 버튼
+                    detail_col, bookmark_col = st.columns([1, 1])
 
-                        st.toast("북마크를 삭제했습니다.", icon="💔")
-                        st.rerun()
+                    with detail_col:
+                        if st.button(
+                            "상세보기",
+                            key=f"detail_{item_id}",
+                            width="stretch"
+                        ):
+                            #st.session_state["selected_item_id"] = item_id
+                            #st.session_state["current_menu"] = "게시글 상세보기"
+                            #st.rerun()
+                            st.toast("상세보기 기능은 준비 중입니다.")
 
-                    except Exception as e:
-                        print(f"북마크 삭제 오류: {e}")
-                        st.error("북마크 삭제에 실패했습니다.")
+                    with bookmark_col:
+                        if st.button(
+                            "북마크 삭제",
+                            key=f"remove_bookmark_{item_id}",
+                            help="북마크 삭제",
+                            width="stretch"
+                        ):
+                            try:
+                                (
+                                    supabase.table("bookmarks")
+                                    .delete()
+                                    .eq("user_id", str(current_user.id))
+                                    .eq("item_id", item_id)
+                                    .execute()
+                                )
+
+                                st.toast("북마크를 삭제했습니다.")
+                                st.rerun()
+
+                            except Exception as e:
+                                print(f"북마크 삭제 오류: {e}")
+                                st.error("북마크 삭제에 실패했습니다.")
 
     except Exception as e:
         print(f"북마크 조회 오류: {e}")
