@@ -1,6 +1,7 @@
 import streamlit as st
 from DB.database import get_supabase_client
 from views.mypage.auth import delete_user
+from views.mypage.bookmark import register_bookmark, delete_bookmark, render_bookmarks
 
 
 
@@ -19,9 +20,8 @@ def render_mypage() -> None:
     st.write(f"**사용자 ID: {user_id}님**")
 
     st.divider()
-    st.subheader("북마크")
-    st.info("북마크 기능은 준비 중입니다.")
-    render_delete_account_section()  # 회원탈퇴 섹션
+    render_bookmarks()
+    render_delete_account_section()
 
 # 회원탈퇴 섹션 표시
 def render_delete_account_section():
