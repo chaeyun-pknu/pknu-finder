@@ -434,6 +434,7 @@ def render_register():
                         "사진 업로드",
                         type=["jpg", "jpeg", "png"],
                         accept_multiple_files=True,
+                        max_upload_size=5,
                         key=picker_key,
                         on_change=photo_changed,
                         label_visibility="collapsed"
