@@ -1,0 +1,98 @@
+/* register.css의 여백, 테두리, 색상, 입력 스타일과 통일 */
+.st-key-detail_card {
+    background: #FFFFFF;
+    border: 1px solid #E5EAF3;
+    border-radius: 20px;
+    padding: 28px;
+    box-shadow: 0 8px 28px rgba(29, 62, 108, 0.06);
+}
+
+.detail-label {
+    color: #334155;
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.detail-value {
+    background: #F8FAFD;
+    border: 1px solid #DFE6F0;
+    border-radius: 11px;
+    color: #17243A;
+    padding: 10px 14px;
+    min-height: 41px;
+    margin-bottom: 15px;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.st-key-detail_photo_box {
+    background: #F3F7FF;
+    border: 2px dashed #AFC8F0;
+    border-radius: 16px;
+    min-height: 190px;
+    padding: 12px;
+}
+
+.st-key-detail_photo_box [data-testid="stImage"] img {
+    display: block;
+    width: 100%;
+    max-height: 380px;
+    object-fit: contain;
+    border-radius: 10px;
+}
+
+.detail-photo-empty {
+    min-height: 190px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #64748B;
+    font-size: 14px;
+}
+
+.detail-tags-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.detail-tag {
+    display: inline-block;
+    padding: 5px 10px;
+    border-radius: 100px;
+    background: #EFF6FF;
+    color: #2563EB;
+    border: 1px solid #D8E7FF;
+    font-size: 13px;
+}
+
+.detail-description {
+    background: #F8FAFD;
+    border: 1px solid #DFE6F0;
+    border-radius: 11px;
+    min-height: 170px;
+    padding: 14px;
+    color: #17243A;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.st-key-detail_chat_area button {
+    background: #2563EB !important;
+    border: none !important;
+    border-radius: 12px !important;
+    color: #FFFFFF !important;
+    min-height: 52px !important;
+    font-weight: 700 !important;
+}
+
+.st-key-detail_chat_area button:disabled {
+    opacity: .45;
+}
+
+@media (max-width: 720px) {
+    .st-key-detail_card {
+        padding: 16px;
+    }
+}
