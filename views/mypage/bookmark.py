@@ -4,7 +4,6 @@ from DB.database import get_supabase_client
 
 
 def get_current_user_id():
-    """현재 로그인한 사용자의 UUID를 반환한다."""
     user_id = st.session_state.get("user_id")
 
     if not user_id:
@@ -12,14 +11,10 @@ def get_current_user_id():
 
     return str(user_id)
 
-
+# ============================================
+# 북마크 등록
+# ============================================
 def register_bookmark(item_id: int) -> tuple[bool, str]:
-    """
-    현재 사용자의 북마크를 등록한다.
-
-    Returns:
-        (성공 여부, 결과 메시지)
-    """
     user_id = get_current_user_id()
 
     if not user_id:
@@ -53,8 +48,10 @@ def register_bookmark(item_id: int) -> tuple[bool, str]:
         return False, "북마크 등록에 실패했습니다."
 
 
+# ============================================
+# 북마크 삭제
+# ============================================
 def delete_bookmark(item_id: int) -> bool:
-    """현재 사용자의 북마크를 삭제한다."""
     user_id = get_current_user_id()
 
     if not user_id:
@@ -75,9 +72,10 @@ def delete_bookmark(item_id: int) -> bool:
         print(f"북마크 삭제 오류: {e}")
         return False
 
-
+# ============================================
+# 북마크 확인
+# ============================================
 def is_bookmarked(item_id: int) -> bool:
-    """특정 게시글이 현재 사용자의 북마크인지 확인한다."""
     user_id = get_current_user_id()
 
     if not user_id:
@@ -101,9 +99,10 @@ def is_bookmarked(item_id: int) -> bool:
         print(f"북마크 확인 오류: {e}")
         return False
 
-
+# ============================================
+# 북마크 목록 조회
+# ============================================
 def get_bookmarks():
-    """현재 사용자의 북마크 목록을 반환한다."""
     user_id = get_current_user_id()
 
     if not user_id:

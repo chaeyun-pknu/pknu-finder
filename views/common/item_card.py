@@ -1,4 +1,3 @@
-
 import streamlit as st
 from pathlib import Path
 from html import escape
@@ -8,9 +7,10 @@ from views.mypage.bookmark import (
     delete_bookmark,
 )
 
-
+# ============================================
+# CSS 불러오기
+# ============================================
 def load_item_card_css():
-    """공통 게시글 카드 CSS 로드"""
     css_path = Path(__file__).parent / "item_card.css"
 
     if css_path.exists():
@@ -20,9 +20,10 @@ def load_item_card_css():
                 unsafe_allow_html=True,
             )
 
-
+# ===========================================
+# 게시글 카드 렌더링
+# ===========================================
 def get_item_image_url(supabase, image_path):
-    """Private Storage 이미지의 Signed URL 생성"""
     if not image_path:
         return None
 
@@ -42,15 +43,18 @@ def get_item_image_url(supabase, image_path):
         print(f"이미지 로드 오류: {e}")
         return None
 
-
+# ===========================================
+# 게시글 날짜 포맷팅
+# ===========================================
 def format_item_date(value):
-    """게시글 날짜 표시"""
     if not value:
         return "날짜 미입력"
 
     return str(value)[:10]
 
-
+# ===========================================
+# 게시글 카드 렌더링
+# ===========================================
 def render_item_card(
     supabase,
     item,
@@ -60,8 +64,6 @@ def render_item_card(
     key_prefix="item",
 ):
     """
-    공통 게시글 카드
-
     Args:
         supabase: Supabase 클라이언트
         item: 게시글 데이터
@@ -75,10 +77,10 @@ def render_item_card(
 
     item_id = item["id"]
 
-    title = item.get("title") or "제목 없음"
-    status = item.get("status") or "미분류"
-    category = item.get("category") or "미입력"
-    location = item.get("location") or "장소 미입력"
+    title = item.get("title")
+    status = item.get("status")
+    category = item.get("category")
+    location = item.get("location")
     lost_date = format_item_date(item.get("lost_date"))
 
     image_url = get_item_image_url(supabase, image_path)
