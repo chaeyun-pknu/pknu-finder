@@ -181,13 +181,27 @@ def add_tag():
         .strip()
     )
 
+    # 이전 안내 문구를 새 입력 결과로 갱신
+    st.session_state["register_tag_feedback"] = ""
+
     if not value:
         return
 
     tags = st.session_state.register_tags
 
-    # 중복 방지 및 최대 10개 제한
-    if value not in tags and len(tags) < 10:
+    if len(value) > MAX_TAG_LENGTH:
+        st.session_state["register_tag_feedback"] = (
+            f"태그는 {MAX_TAG_LENGTH}자 이내로 입력해 주세요."
+        )
+    elif any(tag.casefold() == value.casefold() for tag in tags):
+        st.session_state["register_tag_feedback"] = (
+            "이미 추가한 태그입니다."
+        )
+    elif len(tags) >= MAX_TAGS:
+        st.session_state["register_tag_feedback"] = (
+            f"태그는 최대 {MAX_TAGS}개까지 추가할 수 있습니다."
+        )
+    else:
         tags.append(value)
 
     # 태그 입력창 초기화
@@ -587,7 +601,8 @@ def render_register():
             st.markdown("#### 관련 태그")
 
             st.caption(
-                "단어를 입력하고 Enter를 누르면 추가됩니다."
+                f"태그는 최대 {MAX_TAGS}개, 태그당 {MAX_TAG_LENGTH}자까지 "
+                "입력할 수 있습니다. Enter를 눌러 추가해 주세요."
             )
 
             st.text_input(
@@ -599,6 +614,9 @@ def render_register():
             )
 
             tags = st.session_state.register_tags
+            st.caption(f"등록된 태그: {len(tags)}/{MAX_TAGS}개")
+            if st.session_state.get("register_tag_feedback"):
+                st.warning(st.session_state["register_tag_feedback"])
 
             with st.container(
                 key="register_tags"
