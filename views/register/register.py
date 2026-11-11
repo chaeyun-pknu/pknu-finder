@@ -3,6 +3,7 @@ import streamlit as st
 from pathlib import Path
 from datetime import date
 from uuid import uuid4
+from hashlib import sha256
 
 
 # ==========================================
@@ -43,6 +44,14 @@ ITEM_LOCATIONS = [
 # ==========================================
 
 IMAGE_BUCKET = "lost-item-images"
+
+# 등록 화면 입력 제한 (필요하면 이 숫자만 변경)
+MAX_PHOTOS = 10
+MAX_PHOTO_BYTES = 5 * 1024 * 1024  # 사진 한 장당 5MB
+MAX_TAGS = 15
+MAX_TAG_LENGTH = 20
+MAX_TITLE_LENGTH = 60
+MAX_DESCRIPTION_LENGTH = 1000
 
 MIME_TYPES = {
     ".jpg": "image/jpeg",
@@ -204,14 +213,39 @@ def photo_changed():
         st.session_state.get(picker_key) or []
     )
 
+    photos = st.session_state.register_photos
+    # 사용자에게 보여줄 업로드 검증 메시지
+    feedback = []
+    existing_hashes = {
+        sha256(saved["bytes"]).hexdigest()
+        for saved in photos.values()
+    }
+
     for photo in uploaded_files:
+        # 허용 장수를 초과한 사진은 추가하지 않음
+        if len(photos) >= MAX_PHOTOS:
+            feedback.append(f"사진은 최대 {MAX_PHOTOS}장까지 등록할 수 있습니다.")
+            break
+
+        contents = photo.getvalue()
+        if len(contents) > MAX_PHOTO_BYTES:
+            feedback.append(f"{photo.name}: 사진 한 장은 5MB 이하여야 합니다.")
+            continue
+
+        # 파일 이름이 달라도 내용이 동일한 사진이면 중복으로 처리
+        photo_hash = sha256(contents).hexdigest()
+        if photo_hash in existing_hashes:
+            feedback.append(f"{photo.name}: 이미 추가한 사진입니다.")
+            continue
 
         photo_id = uuid4().hex
-
-        st.session_state.register_photos[photo_id] = {
+        photos[photo_id] = {
             "name": photo.name,
-            "bytes": photo.getvalue()
+            "bytes": contents
         }
+        existing_hashes.add(photo_hash)
+
+    st.session_state["register_photo_feedback"] = list(dict.fromkeys(feedback))
 
     # 사진 선택 후 업로더 초기화
     st.session_state.register_picker_version += 1
@@ -369,7 +403,7 @@ def render_register():
                 )
 
                 st.caption(
-                    "선택 사항 · 여러 장 등록 가능"
+                    f"선택 사항 · 최대 {MAX_PHOTOS}장 · 사진당 5MB 이하"
                 )
 
                 # 업로드 영역
@@ -390,6 +424,11 @@ def render_register():
                         on_change=photo_changed,
                         label_visibility="collapsed"
                     )
+
+                for message in st.session_state.get(
+                    "register_photo_feedback", []
+                ):
+                    st.warning(message)
 
                 # 사진 미리보기
                 photos = (
