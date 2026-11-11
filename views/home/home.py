@@ -45,7 +45,6 @@ def render_home() -> None:
     )
 
     st.divider()
-
     render_recent_items()
 
 
