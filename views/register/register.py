@@ -507,9 +507,11 @@ def render_register():
                     placeholder=(
                         "예) 중앙도서관에서 지갑을 잃어버렸어요"
                     ),
+                    max_chars=MAX_TITLE_LENGTH,
                     label_visibility="collapsed",
                     key=f"register_title_{form_version}"
                 )
+                st.caption(f"{len(title)}/{MAX_TITLE_LENGTH}자")
 
                 # 등록 유형
                 st.markdown(
@@ -658,9 +660,11 @@ def render_register():
                     "자세히 작성해 주세요."
                 ),
                 height=200,
+                max_chars=MAX_DESCRIPTION_LENGTH,
                 label_visibility="collapsed",
                 key=f"register_description_{form_version}"
             )
+            st.caption(f"{len(description)}/{MAX_DESCRIPTION_LENGTH}자")
 
             st.write("")
 
@@ -690,6 +694,10 @@ def render_register():
                         "게시글 제목을 입력해 주세요."
                     )
 
+                elif len(title) > MAX_TITLE_LENGTH:
+
+                    st.warning(f"게시글 제목은 {MAX_TITLE_LENGTH}자 이내로 입력해 주세요.")
+
                 elif item_type == "선택해 주세요":
 
                     st.warning(
@@ -713,6 +721,10 @@ def render_register():
                     st.warning(
                         "상세 설명을 입력해 주세요."
                     )
+
+                elif len(description) > MAX_DESCRIPTION_LENGTH:
+
+                    st.warning(f"상세 설명은 {MAX_DESCRIPTION_LENGTH}자 이내로 입력해 주세요.")
 
                 else:
 
