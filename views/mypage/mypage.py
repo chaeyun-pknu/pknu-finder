@@ -1,10 +1,68 @@
 import streamlit as st
 from DB.database import get_supabase_client
+
+
+from views.common.item_card import render_item_card
+from views.mypage.bookmark import get_bookmarks
 from views.mypage.auth import delete_user
-from views.mypage.bookmark import register_bookmark, delete_bookmark, render_bookmarks
+
+# --------------------------------------------------
+# 공통 함수
+# --------------------------------------------------
+def format_date(value):
+    if not value:
+        return "-"
+
+    try:
+        if isinstance(value, str):
+            value = datetime.fromisoformat(
+                value.replace("Z", "+00:00")
+            )
+
+        return value.strftime("%Y.%m.%d")
+
+    except Exception:
+        return str(value)[:10]
 
 
+def get_current_user(supabase):
+    try:
+        return supabase.auth.get_user().user
+    except Exception:
+        return None
 
+#--------------------------------------------------
+# 게시글별 첫 번째 이미지 조회
+#--------------------------------------------------
+def get_item_images(supabase, item_ids):
+    if not item_ids:
+        return {}
+
+    image_map = {}
+
+    try:
+        response = (
+            supabase.table("lost_item_images")
+            .select("*")
+            .in_("lost_item_id", item_ids)
+            .order("created_at")
+            .execute()
+        )
+
+        for image in response.data or []:
+            image_map.setdefault(
+                image.get("lost_item_id"),
+                image.get("image_path")
+            )
+
+    except Exception as e:
+        print(f"게시글 이미지 조회 오류: {e}")
+
+    return image_map
+
+# --------------------------------------------------
+# 마이페이지 메인
+# --------------------------------------------------
 def render_mypage() -> None:
     st.title("마이페이지")
     st.caption("개인 설정 및 북마크를 확인할 수 있습니다.")
@@ -20,10 +78,94 @@ def render_mypage() -> None:
     st.write(f"**사용자 ID: {user_id}님**")
 
     st.divider()
-    render_bookmarks()
+    render_bookmark_section(supabase=get_supabase_client(), bookmarks=get_bookmarks())
     render_delete_account_section()
 
-# 회원탈퇴 섹션 표시
+# --------------------------------------------------
+# 북마크 게시글
+# --------------------------------------------------
+# 북마크 목록 조회
+def render_bookmark_section(supabase, bookmarks):
+    with st.container(key="mypage_bookmarks", border=True):
+        st.subheader("♡ 내가 북마크한 게시글")
+
+        if not bookmarks:
+            st.info("아직 북마크한 게시글이 없습니다.")
+            return
+
+        item_ids = list(dict.fromkeys(
+            bookmark["item_id"]
+            for bookmark in bookmarks
+            if bookmark.get("item_id") is not None
+        ))
+
+        if not item_ids:
+            st.info("북마크한 게시글이 없습니다.")
+            return
+
+        try:
+            response = (
+                supabase.table("lost_items")
+                .select("*")
+                .in_("id", item_ids)
+                .execute()
+            )
+
+            items = response.data or []
+
+        except Exception as e:
+            st.error(f"게시글을 불러오지 못했습니다: {e}")
+            return
+
+        # 북마크 등록 순서 유지
+        item_map = {
+            item["id"]: item
+            for item in items
+        }
+
+        ordered_items = [
+            item_map[item_id]
+            for item_id in item_ids
+            if item_id in item_map
+        ]
+
+        if not ordered_items:
+            st.info("북마크한 게시글이 없습니다.")
+            return
+
+        image_map = get_item_images(
+            supabase,
+            [item["id"] for item in ordered_items]
+        )
+
+        # 공통 게시글 카드 사용
+        for start in range(0, min(len(ordered_items), 6), 2):
+            cols = st.columns(2)
+
+            for col, item in zip(
+                cols,
+                ordered_items[start:start + 2]
+            ):
+                with col:
+                    render_item_card(
+                        supabase=supabase,
+                        item=item,
+                        image_path=image_map.get(item["id"]),
+                        is_bookmarked=True,
+                        show_bookmark_button=True,
+                        key_prefix="mypage_bookmark",
+                    )
+
+        if len(ordered_items) > 6:
+            st.caption(
+                f"최근 6개 게시글을 표시하고 있습니다. "
+                f"전체 {len(ordered_items)}개"
+            )
+
+
+# --------------------------------------------------
+# 회원 탈퇴
+# --------------------------------------------------
 def render_delete_account_section():
     st.divider()
     st.subheader("회원 탈퇴")
