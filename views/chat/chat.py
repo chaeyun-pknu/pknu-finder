@@ -50,6 +50,29 @@ SAMPLE_CHATS = [
 # 2. 세션 상태 초기화
 # ==========================================
 
+# Supabase에서 내가 참여한 채팅방 조회
+def get_my_chat_rooms():
+    supabase = get_supabase_client()
+
+    # 현재 로그인한 사용자 UUID
+    user_id = st.session_state.get("user_id")
+
+    if not user_id:
+        return []
+
+    response = (
+        supabase.table("chat_rooms")
+        .select("*")
+        .or_(
+            f"user1_id.eq.{user_id},user2_id.eq.{user_id}"
+        )
+        .order("created_at", desc=True)
+        .execute()
+    )
+
+    return response.data
+
+
 def init_chat_state():
     if "selected_room" not in st.session_state:
         st.session_state.selected_room = None
@@ -199,6 +222,9 @@ def render_chat_room(room_id):
 def render_chat():
 
     init_chat_state()
+
+    rooms = get_my_chat_rooms()
+    st.write("Supabase 채팅방 조회 결과:", rooms)
 
     # 채팅 CSS 적용
     load_chat_css()
