@@ -143,6 +143,9 @@ def render_search():
     # 6. 검색 버튼 클릭 이벤트
     if search_clicked:
 
+        # 이전 검색 결과 초기화
+        st.session_state.pop("search_results", None)
+
         keyword = keyword.strip()
 
         # 검색 조건이 하나도 없는 경우
@@ -195,9 +198,12 @@ def render_search():
                 st.session_state["search_results"] = results
 
             except Exception as e:
+                
+                print(f"검색 오류: {e}")
 
                 st.error(
-                    f"검색 중 오류가 발생했습니다: {e}"
+                    "검색 중 문제가 발생했습니다. "
+                    "잠시 후 다시 시도해 주세요."
                 )
 
                 return
