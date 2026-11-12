@@ -1,0 +1,83 @@
+
+/* 게시글 카드 */
+[class*="item_card_"] {
+    border-radius: 16px !important;
+}
+
+/* 이미지 영역 */
+.item-card-image-wrapper {
+    width: 100%;
+    max-width: 200px;
+    aspect-ratio: 1 / 1;
+    margin: 0 auto 15px auto;
+    overflow: hidden;
+    border-radius: 12px;
+}
+
+/* 게시글 이미지 */
+.item-card-image {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover;
+    border-radius: 12px;
+}
+
+/* 이미지가 없는 경우 */
+.item-card-no-image {
+    width: 100%;
+    max-width: 200px;
+    aspect-ratio: 1 / 1;
+    margin: 0 auto 15px auto;
+    background: #F0F3F8;
+    border-radius: 12px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    color: #9AA6B8;
+    font-size: 35px;
+}
+
+/* 게시글 제목 */
+.item-card-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: #263B5E;
+    margin-bottom: 12px;
+    overflow-wrap: anywhere;
+}
+
+/* 유형 및 카테고리 */
+.item-card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.item-card-tag {
+    display: inline-block;
+    padding: 5px 10px;
+    background: #EDF3FC;
+    color: #47658D;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* 장소 및 날짜 */
+.item-card-info {
+    font-size: 13px;
+    color: #7B8798;
+    margin-top: 7px;
+    overflow-wrap: anywhere;
+}
+
+/* 게시글 카드 버튼 */
+[class*="item_card_"] div.stButton > button {
+    border-radius: 10px;
+    font-weight: 600;
+    min-height: 38px;
+}
