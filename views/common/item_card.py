@@ -172,6 +172,7 @@ def render_item_card(
                 width="stretch",
             ):
                 st.session_state["selected_item_id"] = item_id
+                st.session_state["previous_menu"] = st.session_state.get("current_menu", "홈")
                 st.session_state["current_menu"] = "게시글 상세보기"
                 st.rerun()
 
