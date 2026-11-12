@@ -107,7 +107,7 @@ def render_item_card(
             st.markdown(
                 """
                 <div class="item-card-no-image">
-                    📦
+                    🖼️
                 </div>
                 """,
                 unsafe_allow_html=True,

@@ -181,10 +181,6 @@ def render_app() -> None:
             st.rerun()
 
     else:
-        # 사이드바 메뉴
-        st.sidebar.title("PKNU Finder")
-        st.sidebar.markdown("---")
-
         selected_menu = st.sidebar.radio(
             "메뉴 선택",
             MENU_OPTIONS,
@@ -206,33 +202,33 @@ def render_app() -> None:
         if selected_menu != "분실물/습득물 등록":
             clear_register_state()
 
-    st.sidebar.markdown("---")
+        st.sidebar.markdown("---")
 
-    # 로그인 사용자 정보 표시
-    profile = get_current_user_profile()
-    username = None
+        # 로그인 사용자 정보 표시
+        profile = get_current_user_profile()
+        username = None
 
-    if profile:
-        username = profile.get("nickname")
+        if profile:
+            username = profile.get("nickname")
 
-    elif st.session_state.get("user_id"):
-        try:
-            username = get_username(
-                st.session_state.user_id
-            )
-        except Exception:
-            username = None
+        elif st.session_state.get("user_id"):
+            try:
+                username = get_username(
+                    st.session_state.user_id
+                )
+            except Exception:
+                username = None
 
-    st.sidebar.write(
-        f"접속 계정: {username}님"
-        if username
-        else "접속 계정"
-    )
+        st.sidebar.write(
+            f"접속 계정: {username}님"
+            if username
+            else "접속 계정"
+        )
 
-    # 로그아웃 버튼
-    if st.sidebar.button("로그아웃", width="stretch"):
-        logout()
-        st.rerun()
+        # 로그아웃 버튼
+        if st.sidebar.button("로그아웃", width="stretch"):
+            logout()
+            st.rerun()
 
     # 선택한 메뉴 실행
     render_selected_page(st.session_state.current_menu)
