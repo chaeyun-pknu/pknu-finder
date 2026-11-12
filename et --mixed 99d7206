@@ -1,0 +1,114 @@
+[33m4cd043c[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mfeature/mypage[m[33m)[m Reapply "feat: mypage css 적용, 기타 계정 관련 화면 추가"
+[33m6d81e78[m[33m ([m[1;31morigin/feature/mypage[m[33m)[m Revert "feat: mypage css 적용, 기타 계정 관련 화면 추가"
+[33m99d7206[m feat: mypage css 적용, 기타 계정 관련 화면 추가
+[33m4f14453[m Merge remote-tracking branch 'origin/main' into feature/mypage
+[33m8358f43[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Merge pull request #94 from chaeyun-pknu/feature/register
+[33ma3e054b[m fix: 주석 정리
+[33mad390d2[m[33m ([m[1;31morigin/feature/register[m[33m, [m[1;32mfeature/register[m[33m)[m feat: 게시글 상세 조회 함수 및 UI 구현 (#17)
+[33m169a11a[m feat: home 최근 등록된 게시글 함수 작성
+[33m58bd644[m fic: home.css 적용
+[33m9a76595[m feat: home.css 추가
+[33me15f775[m feat: 아이템 카드 모듈화
+[33m04f3ce6[m Merge pull request #92 from chaeyun-pknu/feature/register
+[33m7fbc759[m feat: 등록 화면 구역별 장소 선택 및 목록 확장 (#91)
+[33m283e8d7[m Merge pull request #89 from chaeyun-pknu/feature/register
+[33m2a3da36[m feat: 북마크 기초 기능 추가, 상세페이지 연동 필요
+[33m2be7aca[m fix: 사진 업로드 용량 제한 표시 수정(#85)
+[33m0032744[m fix: 사진이 없을 때 북마크가 표시되지 않던 오류 해결
+[33mef67652[m feat: 게시글 글자 수 제한 및 카운터 추가 (#85)
+[33m3d90421[m feat: mypage 북마크 표시
+[33m3bd0434[m feat: 북마크 관련 동작 함수
+[33m5d35c88[m feat: 태그 입력 검증 및 안내 기능 개선 (#85)
+[33m408ac63[m feat: 사진 업로드 검증 기능 개선 (#85)
+[33m709509f[m Merge pull request #84 from chaeyun-pknu/feature/docs
+[33m7a39216[m[33m ([m[1;31morigin/feature/docs[m[33m)[m docs: readme.md 파일 최종 반영수정
+[33m40e62dd[m docs: readme.md 파일 회원 탈퇴 설명 및 프로젝트 구조(chat.css) 수정 반영
+[33m217e677[m docs: readme.md 최신화
+[33mbee822c[m Merge pull request #82 from chaeyun-pknu/feature/docs
+[33m2844db9[m docs: 9주차 회의록 막힌점 수정
+[33m6e52f82[m Merge pull request #80 from chaeyun-pknu/feature/mypage
+[33m3d61b65[m docs: 9주차 회의록 추가
+[33m887951d[m docs: db 관련 문서 최신화 (11.05)
+[33m33173e9[m Merge pull request #78 from chaeyun-pknu/feature/register
+[33me22fb05[m Merge branch 'main' into feature/register
+[33mcd748c1[m Merge pull request #77 from chaeyun-pknu/feature/mypage
+[33m4b1f6fa[m feat: 등록 화면 장소 입력 드롭다운 변경 (#이슈번호)
+[33me2859c1[m fix: 로그인이 안되던 버그 수정
+[33m8eaf5d1[m Merge pull request #74 from chaeyun-pknu/feature/mypage
+[33mf18af38[m fix: Supabase RLS 적용으로 인한 버그 수정
+[33m1110d37[m Merge pull request #71 from chaeyun-pknu/feature/mypage
+[33mb7e1dc9[m Merge pull request #66 from chaeyun-pknu/feature/drill-a
+[33m4796059[m[33m ([m[1;31morigin/feature/drill-a[m[33m)[m docs: 병합 충돌 재실습을 위한 담당자 수정
+[33md5dd8e0[m Merge branch 'main' of https://github.com/chaeyun-pknu/pknu-finder into feature/drill-a
+[33m5fa3545[m Merge branch 'feature/drill-a' of https://github.com/chaeyun-pknu/pknu-finder into feature/drill-a
+[33m5cbc47b[m Merge branch 'main' into feature/drill-a
+[33mb40ec34[m Merge pull request #67 from chaeyun-pknu/feature/drill-c
+[33m80e870c[m[33m ([m[1;31morigin/feature/drill-c[m[33m)[m Merge branch 'main' into feature/drill-c
+[33m3076ae9[m Update drill.md
+[33m6c80df2[m Merge pull request #57 from chaeyun-pknu/feature/drill-b
+[33m7edfa47[m Merge pull request #65 from chaeyun-pknu/featrure/drill-d
+[33mdecedeb[m[33m ([m[1;31morigin/feature/drill-b[m[33m)[m fix: drill1.md 충동 해결
+[33me329255[m Revert "docs: 충돌해결 실습 a로 변경"
+[33m52bd050[m docs: 충돌해결 실습 a로 변경
+[33m985d9d2[m docs: 충돌 실습을 위한 drill.md 내용 수정
+[33m5e0d049[m[33m ([m[1;31morigin/featrure/drill-d[m[33m)[m Merge branch 'main' into featrure/drill-d
+[33m81f39e3[m fix: merge conflict in drill.md
+[33mba469c2[m[33m ([m[1;32mmain[m[33m)[m Merge pull request #64 from chaeyun-pknu/feature/drill-c
+[33me960d98[m[33m ([m[1;32mfeatrure/drill-d[m[33m)[m docs: 충돌실습 d
+[33m32af5a2[m docs: 실습
+[33m7998ac4[m docs: logo이미지 변경
+[33m1bd1453[m chore: 주석 추가, 코드 최적화
+[33mfe9beac[m Merge pull request #63 from chaeyun-pknu/feature/mypage
+[33mee321be[m Merge remote-tracking branch 'origin/main' into feature/mypage
+[33m3466010[m docs: db 폴더 내 잘못 만들어진 파일 삭제
+[33m3ebe819[m Merge branch 'main' into feature/mypage
+[33m1a4618a[m docs: readme, requirements 수정
+[33m09f1211[m Merge pull request #62 from chaeyun-pknu/feature/mypage
+[33mcff87e6[m docs: 팀원 수정
+[33mae3877a[m Merge pull request #60 from chaeyun-pknu/feature/search
+[33m8721fc5[m docs: README.md, database.md, DB_use_guide.md 파일 최신화
+[33m145ac50[m Merge pull request #51 from chaeyun-pknu/feature/chat
+[33mfd9aef0[m[33m ([m[1;31morigin/feature/search[m[33m)[m feat: 검색 필터 기능 구현
+[33m010344a[m docs: 충동 해결 실습 B역할 수정
+[33me0a56b4[m Merge pull request #56 from chaeyun-pknu/feature/drill-a
+[33mc24f412[m docs: 충돌 해결 실습 A 역할 수정
+[33m79ad8e5[m Merge pull request #55 from chaeyun-pknu/feature/drill-a
+[33m49f2292[m Merge branch 'feature/drill-a' of https://github.com/chaeyun-pknu/pknu-finder into feature/drill-a
+[33mbf7be8e[m docs: 충돌 실습 해결
+[33m75e51ae[m Merge pull request #52 from chaeyun-pknu/feature/drill-a
+[33macb86e6[m dose: 충돌해결실습 준비과정
+[33mbe22ad0[m[33m ([m[1;31morigin/feature/chat[m[33m)[m Merge branch 'main' into feature/chat
+[33m3fb41a9[m feat: css 여백 수정, 색깔 수정
+[33m3bb41e4[m Merge pull request #50 from chaeyun-pknu/feature/search
+[33ma5046cf[m feat: css 추가
+[33m77d5f7b[m feat: 송신, 수신 메시지 분류
+[33m272be08[m fix: 병합 후 발생한 실행 오류 수정
+[33m4287a14[m Merge pull request #42 from chaeyun-pknu/feature/search
+[33m476c96c[m feat: 채팅방 텍스트 왼쪽 정렬
+[33m2edb65b[m feat: css 파일 추가
+[33m5863def[m feat: 사이드바에서의 채팅방 목록 초기화
+[33m8a42da9[m Merge branch 'main' into feature/search
+[33m25af495[m feat: 분실물 검색 기능 구현
+[33m77be7f3[m feat: 불필요한 임티 제거
+[33mfe170f2[m feat: 마이페이지 기초 UI구현, 회원 탈퇴 로직 추가, 회원가입 유효성 검사 강화
+[33me2a6df4[m Merge pull request #49 from chaeyun-pknu/feature/register
+[33m60446b8[m fix: 회원탈퇴 기능 수정, 닉네임이 동일할 때 회원가입 절차가 진행되는 버그 수정
+[33mcb1fc75[m fix: 등록 화면 세션 상태 초기화 오류 수정(#6)
+[33m8239c87[m feat: 등록 정보 Supabase 저장 기능 구현 (#6)
+[33m3646781[m pref: 이메일 회원가입 시 유효성 검사 강화 Closes #34
+[33m5476e9b[m feat: 회원탈퇴 로직 추가
+[33mcc13561[m feat: 마이페이지 기초 UI 구현
+[33me04771b[m Merge pull request #46 from chaeyun-pknu/feature/register
+[33m989f2f1[m feat: 물품 카테고리 선택 UI 추가 및 드롭다운 개선 (#45)
+[33m7da5c9c[m Merge pull request #44 from chaeyun-pknu/feature/mypage
+[33mc11e2a6[m docs: DB_use_guide.md 오탈자 및 예제 오류 수정
+[33m881d139[m docs: DB_use_guide 작성
+[33ma912bee[m feat: UI 기본틀 작성
+[33m092683d[m feat: 검색 입력 UI 구현
+[33m3a67e3c[m Merge pull request #41 from chaeyun-pknu/feature/mypage
+[33m980d749[m chore: views폴더 각 페이지 내 from DB.database import get_connection을  from DB.database import get_supabase_client 으로 수정
+[33m73c3f75[m docs: database.md 오탈자 수정
+[33m2d0edb4[m docs: database.md 작성
+[33m54f89c0[m chore: main.py 최적화, import 구문 수정
+[33me1560a8[m rename: DB 폴더 추가 및  import 구문 수정
+[33mda5fd36[m Merge

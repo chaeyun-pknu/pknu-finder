@@ -6,6 +6,7 @@ from DB.database import (
     get_username,
     init_db,
 )
+from views.register.detail import show_item_detail
 
 # 각 화면 연결
 from views.home.home import render_home
@@ -64,6 +65,8 @@ def initialize_session_state() -> None:
         "current_menu": "홈",
         "supabase_access_token": None,
         "supabase_refresh_token": None,
+        "previous_menu": "홈",
+        "selected_item_id": None,
     }
 
     for key, value in defaults.items():
@@ -140,8 +143,17 @@ def render_selected_page(menu: str) -> None:
     elif menu == "채팅":
         render_chat()
 
+    elif menu == "게시글 상세보기":
+        item_id = st.session_state.get("selected_item_id")
+
+        if item_id is not None:
+            show_item_detail(item_id)
+        else:
+            st.warning("상세보기할 게시글이 선택되지 않았습니다.")
+
     else:
         st.warning("선택한 메뉴를 찾을 수 없습니다.")
+    
 
 
 # ==========================================
@@ -154,64 +166,73 @@ def render_app() -> None:
     st.sidebar.title("PKNU Finder")
     st.sidebar.markdown("---")
 
-    current_menu = st.session_state.get(
-        "current_menu",
-        "홈",
-    )
+    current_menu = st.session_state.get("current_menu", "홈")
 
-    if current_menu not in MENU_OPTIONS:
-        current_menu = "홈"
-        st.session_state.current_menu = current_menu
-
-    selected_menu = st.sidebar.radio(
-        "메뉴 선택",
-        MENU_OPTIONS,
-        index=MENU_OPTIONS.index(current_menu),
-        key="menu_radio",
-    )
-
-    # 다른 메뉴에서 채팅 메뉴로 돌아오면 채팅 목록으로 초기화
-    if selected_menu == "채팅" and current_menu != "채팅":
-        st.session_state.selected_room = None
-
-    st.session_state.current_menu = selected_menu
-
-    # 등록 화면에서 다른 메뉴로 이동하면 입력값 초기화
-    if selected_menu != "분실물/습득물 등록":
-        clear_register_state()
-
-    st.sidebar.markdown("---")
-
-    # 로그인 사용자 정보 표시
-    profile = get_current_user_profile()
-    username = None
-
-    if profile:
-        username = profile.get("nickname")
-
-    elif st.session_state.get("user_id"):
-        try:
-            username = get_username(
-                st.session_state.user_id
+    # 상세 페이지에서는 사이드바 메뉴를 표시하지 않고
+    # 기존 메뉴 상태를 유지한다.
+    if current_menu == "게시글 상세보기":
+        if st.sidebar.button("← 이전 화면으로 돌아가기", width="stretch"):
+            previous_menu = st.session_state.get(
+                "previous_menu", "홈"
             )
-        except Exception:
-            username = None
 
-    st.sidebar.write(
-        f"접속 계정: {username}님"
-        if username
-        else "접속 계정"
-    )
+            st.session_state.current_menu = previous_menu
+            st.session_state.selected_item_id = None
+            st.rerun()
 
-    # 로그아웃 버튼
-    if st.sidebar.button(
-        "로그아웃",
-        use_container_width=True,
-    ):
-        logout()
+    else:
+        selected_menu = st.sidebar.radio(
+            "메뉴 선택",
+            MENU_OPTIONS,
+            index=MENU_OPTIONS.index(current_menu),
+            key="menu_radio",
+        )
+
+        # 메뉴 변경 시 이전 메뉴 저장
+        if selected_menu != current_menu:
+            st.session_state.previous_menu = current_menu
+
+        # 채팅 메뉴로 이동하면 채팅 목록 초기화
+        if selected_menu == "채팅" and current_menu != "채팅":
+            st.session_state.selected_room = None
+
+        st.session_state.current_menu = selected_menu
+
+        # 등록 화면에서 다른 메뉴로 이동하면 입력값 초기화
+        if selected_menu != "분실물/습득물 등록":
+            clear_register_state()
+
+        st.sidebar.markdown("---")
+
+        # 로그인 사용자 정보 표시
+        profile = get_current_user_profile()
+        username = None
+
+        if profile:
+            username = profile.get("nickname")
+
+        elif st.session_state.get("user_id"):
+            try:
+                username = get_username(
+                    st.session_state.user_id
+                )
+            except Exception:
+                username = None
+
+        st.sidebar.write(
+            f"접속 계정: {username}님"
+            if username
+            else "접속 계정"
+        )
+
+        # 로그아웃 버튼
+        if st.sidebar.button("로그아웃", width="stretch"):
+            logout()
+            st.rerun()
 
     # 선택한 메뉴 실행
-    render_selected_page(selected_menu)
+    render_selected_page(st.session_state.current_menu)
+
 
 
 # ==========================================

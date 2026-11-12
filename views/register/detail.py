@@ -10,11 +10,22 @@ from pathlib import Path
 import streamlit as st
 from DB.database import get_supabase_client
 
-
+#===============================
+# CSS 불러오기
+#===============================
 IMAGE_BUCKET = "lost-item-images"
 CSS_PATH = Path(__file__).with_name("detail.css")
 
+def _load_css():
+    if CSS_PATH.exists():
+        st.markdown(
+            f"<style>{CSS_PATH.read_text(encoding='utf-8')}</style>",
+            unsafe_allow_html=True,
+        )
 
+# ==============================
+# DB 조회
+# =============================#
 def get_item_detail(item_id, supabase=None):
     """게시글 ID로 본문 정보 조회"""
     client = supabase if supabase is not None else get_supabase_client()
@@ -58,15 +69,6 @@ def get_signed_image_url(supabase, image_path):
             or response.get("signed_url")
         )
     return None
-
-
-def _load_css():
-    if CSS_PATH.exists():
-        st.markdown(
-            f"<style>{CSS_PATH.read_text(encoding='utf-8')}</style>",
-            unsafe_allow_html=True,
-        )
-
 
 def _read_only_field(label, value):
     """등록 화면 입력 필드와 같은 모양의 읽기 전용 정보"""
@@ -153,7 +155,7 @@ def show_item_detail(item_id):
                         ) if len(image_urls) > 1 else 0
                         st.image(
                             image_urls[image_idx],
-                            use_container_width=True,
+                            width="stretch",
                         )
                     else:
                         st.markdown(
