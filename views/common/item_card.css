@@ -57,7 +57,7 @@
     margin-bottom: 12px;
 }
 
-.item-card-tag {
+.item-card-category-tag {
     display: inline-block;
     padding: 5px 10px;
     background: #EDF3FC;
@@ -65,6 +65,26 @@
     border-radius: 8px;
     font-size: 12px;
     font-weight: 600;
+}
+
+.item-card-status-tag {
+    display: inline-block;
+    padding: 5px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* 분실물 태그 */
+.item-status-lost {
+    background-color: #FDE8E8;
+    color: #D94848;
+}
+
+/* 습득물 태그 */
+.item-status-found {
+    background-color: #E5F3E9;
+    color: #27834A;
 }
 
 /* 장소 및 날짜 */
@@ -75,9 +95,27 @@
     overflow-wrap: anywhere;
 }
 
-/* 게시글 카드 버튼 */
+
+/* 게시글 카드 버튼 공통 */
 [class*="item_card_"] div.stButton > button {
     border-radius: 10px;
     font-weight: 600;
     min-height: 38px;
+    transition: background-color 0.2s ease,
+                border-color 0.2s ease,
+                color 0.2s ease;
+}
+
+/* 상세보기 버튼 hover */
+[class*="detail_area_"] div.stButton > button:hover {
+    background-color: #DBEAFE !important;
+    border-color: #93C5FD !important;
+    color: #3168D5 !important;
+}
+
+/* 북마크 버튼 hover */
+[class*="bookmark_area_"] div.stButton > button:hover {
+    background-color: #FCE7F3 !important;
+    border-color: #F9A8D4 !important;
+    color: #BE185D !important;
 }

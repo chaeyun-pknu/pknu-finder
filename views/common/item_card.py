@@ -124,13 +124,21 @@ def render_item_card(
         )
 
         # 등록 유형 및 카테고리
+        status = item.get("status")
+        if status == "분실":
+            status_class = "item-status-lost"
+            status_text = "분실물"
+        else:
+            status_class = "item-status-found"
+            status_text = "습득물"
+
         st.markdown(
             f"""
             <div class="item-card-tags">
-                <span class="item-card-tag">
-                    {escape(str(status))}
+                <span class="item-card-status-tag {status_class}">
+                    {escape(str(status_text))}
                 </span>
-                <span class="item-card-tag">
+                <span class="item-card-category-tag">
                     {escape(str(category))}
                 </span>
             </div>
@@ -166,49 +174,51 @@ def render_item_card(
             bookmark_col = None
 
         with detail_col:
-            if st.button(
-                "상세보기",
-                key=f"{key_prefix}_detail_{item_id}",
-                width="stretch",
-            ):
-                st.session_state["selected_item_id"] = item_id
-                st.session_state["previous_menu"] = st.session_state.get("current_menu", "홈")
-                st.session_state["current_menu"] = "게시글 상세보기"
-                st.rerun()
+            with st.container(key=f"{key_prefix}_detail_area_{item_id}"):
+                if st.button(
+                    "상세보기",
+                    key=f"{key_prefix}_detail_{item_id}",
+                    width="stretch",
+                ):
+                    st.session_state["selected_item_id"] = item_id
+                    st.session_state["previous_menu"] = st.session_state.get("current_menu", "홈")
+                    st.session_state["current_menu"] = "게시글 상세보기"
+                    st.rerun()
 
         if show_bookmark_button:
             with bookmark_col:
-                button_label = (
-                    "❤️ 북마크 해제"
-                    if is_bookmarked
-                    else "🤍 북마크"
-                )
+                with st.container(key=f"{key_prefix}_bookmark_area_{item_id}"):
+                    button_label = (
+                        "❤️ 북마크 해제"
+                        if is_bookmarked
+                        else "🤍 북마크"
+                    )
 
-                if st.button(
-                    button_label,
-                    key=f"{key_prefix}_bookmark_{item_id}",
-                    width="stretch",
-                ):
-                    user_id = st.session_state.get("user_id")
+                    if st.button(
+                        button_label,
+                        key=f"{key_prefix}_bookmark_{item_id}",
+                        width="stretch",
+                    ):
+                        user_id = st.session_state.get("user_id")
 
-                    if not user_id or not st.session_state.get("logged_in"):
-                        st.warning("로그인이 필요합니다.")
-                        return
+                        if not user_id or not st.session_state.get("logged_in"):
+                            st.warning("로그인이 필요합니다.")
+                            return
 
-                    if is_bookmarked:
-                        success = delete_bookmark(item_id)
+                        if is_bookmarked:
+                            success = delete_bookmark(item_id)
 
-                        if success:
-                            st.toast("북마크를 해제했습니다.")
+                            if success:
+                                st.toast("북마크를 해제했습니다.")
+                            else:
+                                st.error("북마크 해제에 실패했습니다.")
+
                         else:
-                            st.error("북마크 해제에 실패했습니다.")
+                            success, message = register_bookmark(item_id)
 
-                    else:
-                        success, message = register_bookmark(item_id)
+                            if success:
+                                st.toast(message)
+                            else:
+                                st.error(message)
 
-                        if success:
-                            st.toast(message)
-                        else:
-                            st.error(message)
-
-                    st.rerun()
+                        st.rerun()

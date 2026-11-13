@@ -9,6 +9,7 @@ from pathlib import Path
 
 import streamlit as st
 from DB.database import get_supabase_client
+from views.mypage.bookmark import *
 
 #===============================
 # CSS 불러오기
@@ -163,13 +164,30 @@ def show_item_detail(item_id):
                             unsafe_allow_html=True,
                         )
 
-                # 북마크 담당 코드와 연동할 때 활성화
-                st.button(
-                    "♡ 관심",
-                    key=f"detail_bookmark_{item['id']}",
-                    disabled=True,
-                    help="북마크 기능 연동 후 활성화됩니다.",
+                # 북마크
+                button_label = (
+                    "❤️ 북마크 해제"
+                    if is_bookmarked(item["id"])
+                    else "🤍 북마크"
                 )
+                if st.button(
+                    button_label,
+                    key=f"detail_bookmark_{item['id']}",
+                ):
+                    if is_bookmarked(item["id"]):
+                        success = delete_bookmark(item['id'])
+                        if success:
+                            st.toast("북마크를 해제했습니다.")
+                        else:
+                            st.error("북마크 해제에 실패했습니다.")
+
+                    else:
+                        success, message = register_bookmark(item['id'])
+                        if success:
+                            st.toast(message)
+                        else:
+                            st.error(message)
+                    st.rerun()
 
             # 오른쪽: 등록 화면의 입력 영역 위치에 읽기 전용 정보
             with info_col:
