@@ -73,7 +73,7 @@ Streamlit 애플리케이션이 Supabase에 연결하려면 프로젝트 URL과 
 
 1. Supabase Dashboard에서 생성한 프로젝트를 선택합니다.
 2. **Project Overview**로 이동합니다.
-3. 프로젝트 명 아래에 위치한 Project URL을 확인합니다.
+3. 프로젝트명 아래에 위치한 Project URL을 확인합니다.
 4. 해당 URL을 복사합니다.
 
 예시:
@@ -540,7 +540,7 @@ ORDER BY tablename, policyname;
 
 ### 5-3. 실제 적용된 RLS 정책 (2026-11-05)
 
-`public`의 6개 테이블 모두 `relrowsecurity = true`, `relforcerowsecurity = false`입니다. 다음은 현재를 기즌으로 `pg_policies` 조회 결과에 있는 총 16개 정책을 요약한 표입니다. 
+`public`의 6개 테이블 모두 `relrowsecurity = true`, `relforcerowsecurity = false`입니다. 다음은 현재를 기준으로 `pg_policies` 조회 결과에 있는 총 16개 정책을 요약한 표입니다. 
 아래에서 '본인'은 `auth.uid()`가 해당 행의 사용자 ID와 일치하는 경우를 의미합니다.
 
 | 테이블 | SELECT | INSERT | UPDATE | DELETE |
