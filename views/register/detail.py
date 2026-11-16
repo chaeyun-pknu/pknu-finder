@@ -9,12 +9,24 @@ from pathlib import Path
 
 import streamlit as st
 from DB.database import get_supabase_client
+from views.mypage.bookmark import *
 
-
+#===============================
+# CSS 불러오기
+#===============================
 IMAGE_BUCKET = "lost-item-images"
 CSS_PATH = Path(__file__).with_name("detail.css")
 
+def _load_css():
+    if CSS_PATH.exists():
+        st.markdown(
+            f"<style>{CSS_PATH.read_text(encoding='utf-8')}</style>",
+            unsafe_allow_html=True,
+        )
 
+# ==============================
+# DB 조회
+# =============================#
 def get_item_detail(item_id, supabase=None):
     """게시글 ID로 본문 정보 조회"""
     client = supabase if supabase is not None else get_supabase_client()
@@ -58,15 +70,6 @@ def get_signed_image_url(supabase, image_path):
             or response.get("signed_url")
         )
     return None
-
-
-def _load_css():
-    if CSS_PATH.exists():
-        st.markdown(
-            f"<style>{CSS_PATH.read_text(encoding='utf-8')}</style>",
-            unsafe_allow_html=True,
-        )
-
 
 def _read_only_field(label, value):
     """등록 화면 입력 필드와 같은 모양의 읽기 전용 정보"""
@@ -153,7 +156,7 @@ def show_item_detail(item_id):
                         ) if len(image_urls) > 1 else 0
                         st.image(
                             image_urls[image_idx],
-                            use_container_width=True,
+                            width="stretch",
                         )
                     else:
                         st.markdown(
@@ -161,13 +164,30 @@ def show_item_detail(item_id):
                             unsafe_allow_html=True,
                         )
 
-                # 북마크 담당 코드와 연동할 때 활성화
-                st.button(
-                    "♡ 관심",
-                    key=f"detail_bookmark_{item['id']}",
-                    disabled=True,
-                    help="북마크 기능 연동 후 활성화됩니다.",
+                # 북마크
+                button_label = (
+                    "❤️ 북마크 해제"
+                    if is_bookmarked(item["id"])
+                    else "🤍 북마크"
                 )
+                if st.button(
+                    button_label,
+                    key=f"detail_bookmark_{item['id']}",
+                ):
+                    if is_bookmarked(item["id"]):
+                        success = delete_bookmark(item['id'])
+                        if success:
+                            st.toast("북마크를 해제했습니다.")
+                        else:
+                            st.error("북마크 해제에 실패했습니다.")
+
+                    else:
+                        success, message = register_bookmark(item['id'])
+                        if success:
+                            st.toast(message)
+                        else:
+                            st.error(message)
+                    st.rerun()
 
             # 오른쪽: 등록 화면의 입력 영역 위치에 읽기 전용 정보
             with info_col:

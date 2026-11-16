@@ -1,5 +1,12 @@
 import streamlit as st
 from views.search.search_service import search_items
+from DB.database import get_supabase_client
+
+from views.register.detail import (
+    show_item_detail,
+    get_item_images,
+    get_signed_image_url
+)
 
 
 # ==========================================
@@ -54,6 +61,19 @@ def clear_search_filters():
 # ==========================================
 
 def render_search():
+
+     # 상세 페이지 진입 여부 확인
+    if st.session_state.get("selected_item_id"):
+
+        if st.button("← 검색 결과로 돌아가기"):
+            st.session_state.pop("selected_item_id")
+            st.rerun()
+
+        show_item_detail(
+            st.session_state["selected_item_id"]
+        )
+
+        return
 
     st.title("분실물 / 습득물 검색")
 
@@ -123,6 +143,9 @@ def render_search():
     # 6. 검색 버튼 클릭 이벤트
     if search_clicked:
 
+        # 이전 검색 결과 초기화
+        st.session_state.pop("search_results", None)
+
         keyword = keyword.strip()
 
         # 검색 조건이 하나도 없는 경우
@@ -175,13 +198,16 @@ def render_search():
                 st.session_state["search_results"] = results
 
             except Exception as e:
+                
+                print(f"검색 오류: {e}")
 
                 st.error(
-                    f"검색 중 오류가 발생했습니다: {e}"
+                    "검색 중 문제가 발생했습니다. "
+                    "잠시 후 다시 시도해 주세요."
                 )
 
                 return
-
+            
     # 8. 검색 결과 표시
     if "search_results" in st.session_state:
 
@@ -190,39 +216,82 @@ def render_search():
         st.subheader("검색 결과")
 
         if not results:
-
             st.info("검색 결과가 없습니다.")
 
         else:
-
             st.success(
                 f"총 {len(results)}개의 결과를 찾았습니다."
             )
+
+            supabase = get_supabase_client()
 
             for item in results:
 
                 with st.container(border=True):
 
-                    st.subheader(
-                        item.get("title", "제목 없음")
-                    )
+                    image_col, info_col = st.columns([1, 3])
 
-                    st.write(
-                        f"분류: {item.get('status', '정보 없음')}"
-                    )
+                    # 이미지 표시
+                    with image_col:
 
-                    st.write(
-                        f"카테고리: {item.get('category', '정보 없음')}"
-                    )
+                        try:
+                            image_paths = get_item_images(
+                                item["id"],
+                                supabase
+                            )
 
-                    st.write(
-                        f"장소: {item.get('location', '정보 없음')}"
-                    )
+                            if image_paths:
+                                image_url = get_signed_image_url(
+                                    supabase,
+                                    image_paths[0]
+                                )
 
-                    st.write(
-                        f"분실 날짜: {item.get('lost_date', '정보 없음')}"
-                    )
+                                if image_url:
+                                    st.image(
+                                        image_url,
+                                        use_container_width=True
+                                    )
+                                else:
+                                    st.caption("이미지 없음")
 
-                    st.write(
-                        item.get("description", "설명 없음")
-                    )
+                            else:
+                                st.caption("등록된 사진이 없습니다.")
+
+                        except Exception as e:
+                            print(f"이미지 조회 오류: {e}")
+                            st.caption("이미지를 불러올 수 없습니다.")
+
+                    # 게시글 정보
+                    with info_col:
+
+                        st.subheader(
+                            item.get("title", "제목 없음")
+                        )
+
+                        st.write(
+                            f"분류: {item.get('status', '정보 없음')}"
+                        )
+
+                        st.write(
+                            f"카테고리: {item.get('category', '정보 없음')}"
+                        )
+
+                        st.write(
+                            f"장소: {item.get('location', '정보 없음')}"
+                        )
+
+                        st.write(
+                            f"날짜: {item.get('lost_date', '정보 없음')}"
+                        )
+
+                        st.write(
+                            item.get("description", "설명 없음")
+                        )
+
+                        # 상세보기 버튼
+                        if st.button(
+                            "상세보기",
+                            key=f"search_detail_{item['id']}"
+                        ):
+                            st.session_state["selected_item_id"] = item["id"]
+                            st.rerun()

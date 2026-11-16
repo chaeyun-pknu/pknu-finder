@@ -1,0 +1,155 @@
+
+/* ========================================
+   전체 홈 화면
+======================================== */
+
+.st-key-home_recent_items {
+    width: 100%;
+    max-width: 1200px;
+    min-width: 0;
+    margin: 0 auto;
+}
+
+/* ========================================
+   메인 소개 영역
+======================================== */
+
+.home-hero {
+    width: 100%;
+    box-sizing: border-box;
+    text-align: center;
+
+    padding: 55px 20px 45px;
+    margin: 0 auto;
+
+    background: linear-gradient(
+        135deg,
+        #F4F8FF 0%,
+        #EAF2FF 50%,
+        #F7FAFF 100%
+    );
+
+    border-radius: 20px;
+    border: 1px solid #E5EDFA;
+}
+
+/* 메인 제목 */
+.home-title {
+    font-size: clamp(30px, 5vw, 48px);
+    font-weight: 800;
+    color: #172F59;
+
+    margin: 0 0 12px;
+    letter-spacing: -1.5px;
+}
+
+/* 서비스 소개 */
+.home-subtitle {
+    font-size: clamp(15px, 2vw, 21px);
+    font-weight: 600;
+    color: #526987;
+
+    margin: 0 0 12px;
+}
+
+/* 안내 문구 */
+.home-description {
+    font-size: 15px;
+    color: #8290A5;
+
+    margin: 0;
+    line-height: 1.7;
+}
+
+/* ========================================
+   구분선
+======================================== */
+
+.st-key-home_recent_items {
+    padding-top: 8px;
+}
+
+/* ========================================
+   최근 등록된 게시글
+======================================== */
+
+.st-key-home_recent_items h2,
+.st-key-home_recent_items h3 {
+    color: #203858;
+    font-weight: 750;
+    letter-spacing: -0.5px;
+}
+
+.st-key-home_recent_items [data-testid="stCaptionContainer"] {
+    color: #8290A5;
+    font-size: 14px;
+}
+
+/* ========================================
+   게시글 카드 배치
+======================================== */
+
+.st-key-home_recent_items [data-testid="stHorizontalBlock"] {
+    align-items: stretch;
+}
+
+.st-key-home_recent_items [data-testid="column"] {
+    min-width: 0;
+}
+
+/* ========================================
+   버튼
+======================================== */
+
+.st-key-home_recent_items div.stButton > button {
+    width: 100%;
+    min-width: 0;
+
+    min-height: 40px;
+    border-radius: 10px;
+
+    font-size: 13px;
+    font-weight: 650;
+
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+/* 보조 버튼 */
+.st-key-home_recent_items div.stButton > button[kind="secondary"] {
+    border: 1px solid #DCE7F7;
+}
+
+/* ========================================
+   좁은 화면
+======================================== */
+
+@media (max-width: 700px) {
+    .home-hero {
+        padding: 38px 14px 32px;
+        border-radius: 15px;
+    }
+
+    .home-title {
+        letter-spacing: -1px;
+    }
+
+    .home-subtitle {
+        font-size: 15px;
+    }
+
+    .home-description {
+        font-size: 13px;
+    }
+
+    .st-key-home_recent_items {
+        padding-top: 4px;
+    }
+
+    .st-key-home_recent_items div.stButton > button {
+        font-size: 12px;
+        min-height: 36px;
+        padding-left: 5px;
+        padding-right: 5px;
+    }
+}

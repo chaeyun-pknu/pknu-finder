@@ -1,49 +1,19 @@
 import streamlit as st
 from pathlib import Path
-from html import escape
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from DB.database import get_supabase_client
 
-# CSS 파일 경로
+# ==========================================
+# 1. CSS 파일 불러오기
+# ==========================================
+
 CSS_PATH = Path(__file__).parent / "chat.css"
+
 
 def load_chat_css():
     with open(CSS_PATH, encoding="utf-8") as f:
         st.html(f"<style>{f.read()}</style>")
-
-# ==========================================
-# 1. 임시 채팅 데이터
-# 추후 Supabase chats 테이블과 연동
-# ==========================================
-
-SAMPLE_CHATS = [
-    {
-        "id": 1,
-        "item_id": 1,
-        "item_title": "검정 지갑",
-        "user_id": "user_a",
-        "message": "안녕하세요! 검정 지갑을 습득하셨나요?",
-        "timestamp": "14:20",
-        "room_id": 1,
-    },
-    {
-        "id": 2,
-        "item_id": 1,
-        "item_title": "검정 지갑",
-        "user_id": "me",
-        "message": "네, 도서관 앞에서 발견했어요.",
-        "timestamp": "14:21",
-        "room_id": 1,
-    },
-    {
-        "id": 3,
-        "item_id": 2,
-        "item_title": "에어팟 프로",
-        "user_id": "user_b",
-        "message": "혹시 에어팟을 발견하셨나요?",
-        "timestamp": "13:10",
-        "room_id": 2,
-    },
-]
 
 
 # ==========================================
@@ -54,16 +24,151 @@ def init_chat_state():
     if "selected_room" not in st.session_state:
         st.session_state.selected_room = None
 
-    if "chat_messages" not in st.session_state:
-        st.session_state.chat_messages = [
-            chat.copy() for chat in SAMPLE_CHATS
-        ]
+
+# ==========================================
+# 3. 날짜 및 시간 변환
+# ==========================================
+
+def format_timestamp(timestamp):
+    if not timestamp:
+        return ""
+
+    try:
+        dt = datetime.fromisoformat(
+            timestamp.replace("Z", "+00:00")
+        )
+        dt = dt.astimezone(ZoneInfo("Asia/Seoul"))
+        return dt.strftime("%m/%d %H:%M")
+    except (ValueError, TypeError):
+        return str(timestamp)
 
 
 # ==========================================
-# 3. 채팅 목록 화면
+# 4. 내가 참여한 채팅방 조회
 # ==========================================
 
+def get_my_chat_rooms():
+    supabase = get_supabase_client()
+
+    user_id = st.session_state.get("user_id")
+
+    if not user_id:
+        return []
+
+    response = (
+        supabase.table("chat_rooms")
+        .select("*")
+        .or_(
+            f"user1_id.eq.{user_id},user2_id.eq.{user_id}"
+        )
+        .order("created_at", desc=True)
+        .execute()
+    )
+
+    return response.data
+
+
+# ==========================================
+# 5. 채팅방 정보 및 메시지 조회
+# ==========================================
+
+def get_room_info(room_id):
+    supabase = get_supabase_client()
+    user_id = str(st.session_state.get("user_id"))
+
+    response = (
+        supabase.table("chat_rooms")
+        .select("*")
+        .eq("id", room_id)
+        .execute()
+    )
+
+    if not response.data:
+        return None
+
+    room = response.data[0]
+
+    # 현재 사용자가 이 방의 참여자인지 확인
+    participants = [
+        str(room["user1_id"]),
+        str(room["user2_id"]),
+    ]
+
+    if user_id not in participants:
+        return None
+
+    return room
+
+
+def get_room_messages(room_id):
+    supabase = get_supabase_client()
+
+    response = (
+        supabase.table("chats")
+        .select("*")
+        .eq("room_id", room_id)
+        .order("timestamp", desc=False)
+        .execute()
+    )
+
+    return response.data
+
+
+def get_item_title(item_id):
+    supabase = get_supabase_client()
+
+    response = (
+        supabase.table("lost_items")
+        .select("title")
+        .eq("id", item_id)
+        .execute()
+    )
+
+    if response.data:
+        return response.data[0]["title"]
+
+    return f"게시글 #{item_id}"
+
+
+# ==========================================
+# 6. 메시지 저장
+# ==========================================
+
+def send_message(room_id, message):
+    supabase = get_supabase_client()
+
+    user_id = str(st.session_state.get("user_id"))
+
+    room = get_room_info(room_id)
+
+    if not room:
+        raise ValueError("참여 중인 채팅방이 아닙니다.")
+
+    # 상대방 UUID 확인
+    if user_id == str(room["user1_id"]):
+        receiver_id = room["user2_id"]
+    else:
+        receiver_id = room["user1_id"]
+
+    # Supabase에 메시지 저장
+    response = (
+        supabase.table("chats")
+        .insert({
+            "item_id": room["item_id"],
+            "room_id": room_id,
+            "user_id": user_id,
+            "receiver_id": receiver_id,
+            "message": message,
+        })
+        .execute()
+    )
+
+    return response.data
+
+
+# ==========================================
+# 7. 채팅 목록 화면
+# ==========================================
 
 def render_chat_list():
     st.title("채팅")
@@ -71,44 +176,41 @@ def render_chat_list():
 
     st.divider()
 
-    messages = st.session_state.chat_messages
-
-    # 임시 채팅방 구성
-    rooms = {}
-
-    for chat in messages:
-        room_id = chat["room_id"]
-
-        if room_id not in rooms:
-            rooms[room_id] = {
-                "item_title": chat["item_title"],
-                "last_message": chat["message"],
-                "timestamp": chat["timestamp"],
-            }
-        else:
-            rooms[room_id]["last_message"] = chat["message"]
-            rooms[room_id]["timestamp"] = chat["timestamp"]
+    rooms = get_my_chat_rooms()
 
     if not rooms:
         st.info("참여 중인 채팅방이 없습니다.")
         return
 
-    
-    # 채팅방 목록 표시
-    for room_id, room in rooms.items():
+    for room in rooms:
+        room_id = room["id"]
+        item_id = room["item_id"]
 
-        # 버튼 내부에 표시할 내용
-        title = room["item_title"]
-        message = room["last_message"]
-        timestamp = room["timestamp"]
+        # 게시글 제목 조회
+        title = get_item_title(item_id)
 
+        # 마지막 메시지 조회
+        messages = get_room_messages(room_id)
+
+        if messages:
+            last_chat = messages[-1]
+            message = last_chat["message"]
+            timestamp = format_timestamp(
+                last_chat["timestamp"]
+            )
+        else:
+            message = "아직 메시지가 없습니다."
+            timestamp = format_timestamp(
+                room["created_at"]
+            )
+
+        # 기존 UI 유지
         button_label = (
             f"**{title}**\n\n"
             f"{message}\n\n"
             f"{timestamp}"
         )
 
-        # 채팅방 전체가 하나의 버튼
         if st.button(
             button_label,
             key=f"chat_room_{room_id}",
@@ -119,18 +221,14 @@ def render_chat_list():
 
 
 # ==========================================
-# 4. 채팅방 상세 화면
+# 8. 채팅방 상세 화면
 # ==========================================
 
 def render_chat_room(room_id):
 
-    messages = [
-        chat
-        for chat in st.session_state.chat_messages
-        if chat["room_id"] == room_id
-    ]
+    room = get_room_info(room_id)
 
-    if not messages:
+    if not room:
         st.warning("채팅방을 찾을 수 없습니다.")
 
         if st.button("채팅 목록으로"):
@@ -138,7 +236,11 @@ def render_chat_room(room_id):
             st.rerun()
         return
 
-    item_title = messages[0]["item_title"]
+    # 실제 DB 데이터 조회
+    messages = get_room_messages(room_id)
+
+    item_title = get_item_title(room["item_id"])
+    my_id = str(st.session_state.get("user_id"))
 
     # 뒤로가기
     if st.button("← 채팅 목록"):
@@ -148,64 +250,61 @@ def render_chat_room(room_id):
     st.subheader(f"{item_title}의 채팅방")
     st.divider()
 
+    if not messages:
+        st.info("아직 메시지가 없습니다. 첫 메시지를 보내보세요!")
 
     # 메시지 표시
     for chat in messages:
 
-        is_me = chat["user_id"] == "me"
+        is_me = str(chat["user_id"]) == my_id
 
-        # 발신자에 따라 컨테이너 구분
         role = "me" if is_me else "other"
 
-        # 메시지와 시간을 묶는 전체 영역
-        with st.container(key=f"chat-msg-{role}-{chat['id']}"):
+        with st.container(
+            key=f"chat-msg-{role}-{chat['id']}"
+        ):
 
-            # 말풍선 영역
-            with st.container(key=f"bubble-{chat['id']}"):
+            with st.container(
+                key=f"bubble-{chat['id']}"
+            ):
                 st.write(chat["message"])
 
-            # 말풍선 밖의 시간
-            st.caption(chat["timestamp"])
-
-
+            st.caption(
+                format_timestamp(chat["timestamp"])
+            )
 
     # 메시지 입력
     new_message = st.chat_input("메시지를 입력하세요.")
 
-    if new_message:
+    if new_message and new_message.strip():
+        try:
+            send_message(
+                room_id,
+                new_message.strip()
+            )
+            st.rerun()
 
-        new_chat = {
-            "id": max(
-                chat["id"]
-                for chat in st.session_state.chat_messages
-            ) + 1,
-            "item_id": messages[0]["item_id"],
-            "item_title": item_title,
-            "user_id": "me",
-            "message": new_message,
-            "timestamp": "방금",
-            "room_id": room_id,
-        }
+        except Exception as e:
+            st.error(f"메시지 전송 실패: {e}")
 
-        st.session_state.chat_messages.append(new_chat)
-        st.rerun()
-
-#user_id랑 timestamp 임시구현 수정필요
 
 # ==========================================
-# 5. 채팅 메인 함수
+# 9. 채팅 메인 함수
 # ==========================================
 
 def render_chat():
 
     init_chat_state()
 
-    # 채팅 CSS 적용
     load_chat_css()
-    
-    selected_room = st.session_state.selected_room
 
-    if selected_room is None:
-        render_chat_list()
-    else:
-        render_chat_room(selected_room)
+    try:
+        selected_room = st.session_state.selected_room
+
+        if selected_room is None:
+            render_chat_list()
+        else:
+            render_chat_room(selected_room)
+
+    except Exception as e:
+        st.error(f"채팅 데이터 조회 실패: {e}")

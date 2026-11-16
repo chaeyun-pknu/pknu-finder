@@ -1,0 +1,164 @@
+
+/* ========================================
+   전체 마이페이지
+======================================== */
+
+.st-key-mypage_page {
+    width: 100%;
+    max-width: 1200px;
+    min-width: 0;
+    margin: 0 auto;
+}
+
+/* ========================================
+   공통 섹션 카드
+======================================== */
+
+.st-key-mypage_profile,
+.st-key-mypage_bookmarks,
+.st-key-mypage_my_items,
+.st-key-mypage_activity,
+.st-key-mypage_delete {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+
+    background-color: #FFFFFF !important;
+    border: 1px solid #E2EAF7 !important;
+    border-radius: 18px !important;
+
+    padding: 22px !important;
+    margin-top: 20px;
+    margin-bottom: 20px;
+
+    box-shadow: 0 2px 8px rgba(30, 60, 100, 0.035);
+}
+
+/* ========================================
+   프로필
+======================================== */
+
+.mypage-avatar {
+    width: 82px;
+    height: 82px;
+    border-radius: 50%;
+
+    background: #F4F7FB;
+    color: #4280E9;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 42px;
+    margin: 5px auto;
+}
+
+.mypage-name {
+    font-size: 25px;
+    font-weight: 750;
+    color: #17233F;
+    margin-top: 12px;
+
+    overflow-wrap: anywhere;
+}
+
+.mypage-email {
+    font-size: 16px;
+    color: #75819A;
+    margin-top: 5px;
+
+    overflow-wrap: anywhere;
+}
+
+/* ========================================
+   통계
+======================================== */
+
+.mypage-stat {
+    min-width: 0;
+    text-align: center;
+    padding: 8px 3px;
+}
+
+.mypage-stat-label {
+    color: #75819A;
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.mypage-stat-value {
+    color: #17233F;
+    font-size: 23px;
+    font-weight: 750;
+
+    overflow-wrap: anywhere;
+}
+
+/* ========================================
+   버튼
+======================================== */
+
+.st-key-mypage_page div.stButton > button {
+    border-radius: 10px;
+    font-weight: 600;
+    min-height: 40px;
+}
+
+.st-key-mypage_page div.stButton > button[kind="secondary"] {
+    border-color: #DCE5F2;
+}
+
+/* ========================================
+   회원 탈퇴
+======================================== */
+
+.st-key-mypage_delete {
+    background: #FFFFFF !important;
+}
+
+/* ========================================
+   모바일 및 좁은 화면
+======================================== */
+
+@media (max-width: 700px) {
+    .st-key-mypage_profile,
+    .st-key-mypage_bookmarks,
+    .st-key-mypage_my_items,
+    .st-key-mypage_activity,
+    .st-key-mypage_delete {
+        padding: 14px !important;
+        border-radius: 14px !important;
+    }
+
+    .mypage-avatar {
+        width: 65px;
+        height: 65px;
+        font-size: 32px;
+    }
+
+    .mypage-name {
+        font-size: 20px;
+    }
+
+    .mypage-email {
+        font-size: 13px;
+    }
+
+    .mypage-stat-value {
+        font-size: 17px;
+    }
+
+    .mypage-stat-label {
+        font-size: 11px;
+        overflow-wrap: anywhere;
+    }
+
+    .mypage-activity-title {
+        font-size: 13px;
+    }
+
+    .mypage-activity-sub {
+        font-size: 12px;
+    }
+}

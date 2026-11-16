@@ -3,6 +3,7 @@ Supabase 접속 설정을 관리하는 모듈.
 필수 설정(.streamlit/secrets.toml):
     SUPABASE_URL = "https://<project-ref>.supabase.co"
     SUPABASE_SERVICE_ROLE_KEY = "<server-secret-key>"
+    SUPABASE_ANON_KEY = "<anon-public-key>"
 """
 
 import os
