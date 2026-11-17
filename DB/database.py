@@ -44,46 +44,68 @@ def get_supabase_url() -> str:
     return url.rstrip("/")
 
 
-# 일반 Supabase 클라이언트 생성
+# 일반 Supabase 클라이언트 생성 및 재사용
 def get_supabase_client() -> Client:
+    """현재 로그인 사용자의 Supabase 클라이언트를 재사용합니다."""
+
+    access_token = st.session_state.get("supabase_access_token")
+    refresh_token = st.session_state.get("supabase_refresh_token")
+    session_user_id = st.session_state.get("user_id")
+
+    if not access_token or not refresh_token or not session_user_id:
+        raise DatabaseOperationError("로그인 세션이 없습니다. 다시 로그인해 주세요.")
+
     try:
-        client = create_client(get_supabase_url(), _get_secret("SUPABASE_ANON_KEY"),)
+        # 현재 Streamlit 사용자 세션에 저장된 클라이언트
+        client = st.session_state.get("_supabase_user_client")
 
-        access_token = st.session_state.get("supabase_access_token")
-        refresh_token = st.session_state.get("supabase_refresh_token")
+        # 기존 클라이언트가 있다면 내부 세션의 최신 토큰 확인
+        if client is not None:
+            current_session = client.auth.get_session()
 
-        if not access_token or not refresh_token:
-            raise DatabaseOperationError(
-                "로그인 세션이 없습니다. 다시 로그인해 주세요."
-            )
+            if current_session:
+                # SDK 내부에서 갱신된 토큰을 Streamlit 세션에 반영
+                access_token = current_session.access_token
+                refresh_token = current_session.refresh_token
+                st.session_state["supabase_access_token"] = access_token
+                st.session_state["supabase_refresh_token"] = refresh_token
 
-        # 사용자 인증 세션 적용
-        session_response = client.auth.set_session(access_token, refresh_token)
+        # 클라이언트가 없거나 인증 토큰이 변경된 경우에만 재생성
+        cached_token = st.session_state.get("_supabase_client_access_token")
 
-        # 갱신된 토큰 저장
-        if session_response and session_response.session:
-            st.session_state["supabase_access_token"] = (
-                session_response.session.access_token
-            )
-            st.session_state["supabase_refresh_token"] = (
-                session_response.session.refresh_token
-            )
+        if client is None or cached_token != access_token:
+            anon_key = _get_secret("SUPABASE_ANON_KEY")
 
-        # 실제 인증 사용자 확인
-        auth_response = client.auth.get_user()
+            if not anon_key:
+                raise DatabaseConfigurationError("SUPABASE_ANON_KEY가 설정되지 않았습니다.")
 
-        if not auth_response.user:
-            raise DatabaseOperationError(
-                "사용자 인증 정보를 확인할 수 없습니다."
-            )
+            client = create_client(get_supabase_url(), anon_key)
 
-        # 현재 로그인 사용자 ID와 인증 사용자 ID 비교
-        session_user_id = st.session_state.get("user_id")
+            # 사용자 인증 세션 적용
+            session_response = client.auth.set_session(access_token, refresh_token)
 
-        if str(auth_response.user.id) != str(session_user_id):
-            raise DatabaseOperationError(
-                "로그인 사용자 정보가 일치하지 않습니다."
-            )
+            if not session_response or not session_response.session:
+                raise DatabaseOperationError("Supabase 인증 세션 설정에 실패했습니다.")
+
+            # 실제 인증 사용자 확인 (새 세션일 때만 실행)
+            auth_response = client.auth.get_user()
+
+            if not auth_response.user:
+                raise DatabaseOperationError("사용자 인증 정보를 확인할 수 없습니다.")
+
+            if str(auth_response.user.id) != str(session_user_id):
+                raise DatabaseOperationError("로그인 사용자 정보가 일치하지 않습니다.")
+
+            # 갱신된 토큰 저장
+            access_token = session_response.session.access_token
+            refresh_token = session_response.session.refresh_token
+
+            st.session_state["supabase_access_token"] = access_token
+            st.session_state["supabase_refresh_token"] = refresh_token
+
+            # 클라이언트 및 토큰 정보 캐싱
+            st.session_state["_supabase_user_client"] = client
+            st.session_state["_supabase_client_access_token"] = access_token
 
         return client
 
@@ -92,7 +114,7 @@ def get_supabase_client() -> Client:
 
     except Exception as exc:
         raise DatabaseOperationError(
-            f"Supabase 클라이언트 생성 또는 인증 실패: {exc}"
+            f"Supabase 클라이언트 인증 실패: {exc}"
         ) from exc
 
 # 관리자용 Supabase 클라이언트 생성 및 캐싱

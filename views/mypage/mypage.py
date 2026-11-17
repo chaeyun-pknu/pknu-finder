@@ -6,26 +6,13 @@ from html import escape
 from DB.database import get_supabase_client
 from views.common.item_card import render_item_card
 from views.mypage.bookmark import get_bookmarks
-from views.mypage.auth import delete_user
-
+from views.mypage.auth import delete_user, logout_user
+from views.common.util import *
 
 # --------------------------------------------------
 # CSS 불러오기
 # --------------------------------------------------
-
-def load_mypage_css():
-    css_path = Path(__file__).parent / "mypage.css"
-
-    if not css_path.exists():
-        st.error(f"CSS 파일을 찾을 수 없습니다: {css_path}")
-        return
-
-    with open(css_path, "r", encoding="utf-8") as file:
-        st.markdown(
-            f"<style>{file.read()}</style>",
-            unsafe_allow_html=True
-        )
-
+css_path = Path(__file__).parent / "mypage.css"
 
 # --------------------------------------------------
 # 공통 함수
@@ -88,7 +75,7 @@ def get_item_images(supabase, item_ids):
 # --------------------------------------------------
 
 def render_mypage():
-    load_mypage_css()
+    load_css(css_path)
 
     with st.container(key="mypage_page"):
         st.markdown("**:blue[PKNU FINDER]**")
@@ -416,16 +403,7 @@ def render_delete_account_section():
 
             try:
                 delete_user(user_id)
-
-                st.session_state["logged_in"] = False
-                st.session_state["user_id"] = None
-                st.session_state["user"] = None
-                st.session_state["current_menu"] = "홈"
-
-                st.session_state.pop("_supabase_auth_client", None)
-                st.session_state.pop("supabase_access_token", None)
-                st.session_state.pop("supabase_refresh_token", None)
-
+                logout_user()
                 st.success("회원 탈퇴가 완료되었습니다.")
                 st.rerun()
 

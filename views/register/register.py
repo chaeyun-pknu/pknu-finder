@@ -1,4 +1,5 @@
 from DB.database import get_supabase_client
+from views.common.util import *
 import streamlit as st
 from pathlib import Path
 from datetime import date
@@ -134,7 +135,6 @@ MIME_TYPES = {
 # ==========================================
 
 def upload_item_image(supabase, item_id, photo):
-
     ext = Path(photo["name"]).suffix.lower()
 
     if ext not in MIME_TYPES:
@@ -143,9 +143,7 @@ def upload_item_image(supabase, item_id, photo):
         )
 
     image_path = f"{item_id}/{uuid4().hex}{ext}"
-
     bucket = supabase.storage.from_(IMAGE_BUCKET)
-
     bucket.upload(
         path=image_path,
         file=photo["bytes"],
@@ -172,7 +170,6 @@ def upload_item_image(supabase, item_id, photo):
     except Exception:
         bucket.remove([image_path])
         raise
-
     return image_path
 
 
@@ -416,13 +413,9 @@ def render_register():
 
     form_version = st.session_state.register_form_version
 
-    # 기존 CSS 유지
+    # CSS 불러오기
     css_path = Path(__file__).with_name("register.css")
-
-    st.markdown(
-        f"<style>{css_path.read_text(encoding='utf-8')}</style>",
-        unsafe_allow_html=True
-    )
+    load_css(css_path)
 
     with st.container(key="register_page"):
 

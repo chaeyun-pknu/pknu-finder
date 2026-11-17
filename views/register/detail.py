@@ -9,24 +9,14 @@ from pathlib import Path
 
 import streamlit as st
 from DB.database import get_supabase_client
-from views.mypage.bookmark import (
-    is_bookmarked,
-    register_bookmark,
-    delete_bookmark,
-)
+from views.mypage.bookmark import *
+from views.common.util import *
 
 #===============================
 # CSS 불러오기
 #===============================
 IMAGE_BUCKET = "lost-item-images"
-CSS_PATH = Path(__file__).with_name("detail.css")
-
-def _load_css():
-    if CSS_PATH.exists():
-        st.markdown(
-            f"<style>{CSS_PATH.read_text(encoding='utf-8')}</style>",
-            unsafe_allow_html=True,
-        )
+css_path = Path(__file__).parent / "detail.css"
 
 # ==============================
 # DB 조회
@@ -143,7 +133,7 @@ def show_item_detail(item_id):
     if isinstance(tags, str):
         tags = [tags]
 
-    _load_css()
+    load_css(css_path)
 
     with st.container(key="detail_page"):
         # 등록 화면과 동일한 상단 헤더
