@@ -162,7 +162,6 @@ def send_message(room_id, message):
     response = (
         supabase.table("chats")
         .insert({
-            "item_id": room["item_id"],
             "room_id": room_id,
             "user_id": user_id,
             "receiver_id": receiver_id,
@@ -227,6 +226,43 @@ def render_chat_list():
             st.session_state.selected_room = room_id
             st.rerun()
 
+# ==========================================
+# 메시지 자동 갱신
+# ==========================================
+
+@st.fragment(run_every="3s")
+def render_messages(room_id):
+
+    try:
+        messages = get_room_messages(room_id)
+        my_id = str(st.session_state.get("user_id"))
+
+        if not messages:
+            st.info("아직 메시지가 없습니다. 첫 메시지를 보내보세요!")
+            return
+
+        for chat in messages:
+
+            is_me = str(chat["user_id"]) == my_id
+            role = "me" if is_me else "other"
+
+            with st.container(
+                key=f"chat-msg-{role}-{chat['id']}"
+            ):
+                with st.container(
+                    key=f"bubble-{chat['id']}"
+                ):
+                    st.write(chat["message"])
+
+                st.caption(
+                    format_timestamp(chat["timestamp"])
+                )
+
+    except PermissionError:
+        st.warning("채팅 메시지에 접근할 수 없습니다.")
+
+    except Exception:
+        st.error("메시지를 불러오지 못했습니다.")
 
 # ==========================================
 # 8. 채팅방 상세 화면
@@ -244,11 +280,7 @@ def render_chat_room(room_id):
             st.rerun()
         return
 
-    # 실제 DB 데이터 조회
-    messages = get_room_messages(room_id)
-
     item_title = get_item_title(room["item_id"])
-    my_id = str(st.session_state.get("user_id"))
 
     # 뒤로가기
     if st.button("← 채팅 목록"):
@@ -258,28 +290,8 @@ def render_chat_room(room_id):
     st.subheader(f"{item_title}의 채팅방")
     st.divider()
 
-    if not messages:
-        st.info("아직 메시지가 없습니다. 첫 메시지를 보내보세요!")
-
-    # 메시지 표시
-    for chat in messages:
-
-        is_me = str(chat["user_id"]) == my_id
-
-        role = "me" if is_me else "other"
-
-        with st.container(
-            key=f"chat-msg-{role}-{chat['id']}"
-        ):
-
-            with st.container(
-                key=f"bubble-{chat['id']}"
-            ):
-                st.write(chat["message"])
-
-            st.caption(
-                format_timestamp(chat["timestamp"])
-            )
+    # 메시지 자동 갱신
+    render_messages(room_id)
 
     # 메시지 입력
     new_message = st.chat_input("메시지를 입력하세요.")
@@ -290,11 +302,14 @@ def render_chat_room(room_id):
                 room_id,
                 new_message.strip()
             )
+
+        except Exception as e:
+            print(f"[채팅 전송 오류] {type(e).__name__}: {e}")
+            st.error(
+                "메시지 전송에 실패했습니다. 다시 시도해 주세요."
+            )
+        else:
             st.rerun()
-
-        except Exception:
-            st.error("메시지 전송에 실패했습니다. 다시 시도해주세요")
-
 
 # ==========================================
 # 9. 채팅 메인 함수
