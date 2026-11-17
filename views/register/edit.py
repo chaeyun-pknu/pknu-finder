@@ -53,9 +53,22 @@ def _remove_edit_tag(tags_key, tag):
         st.session_state[tags_key].remove(tag)
 
 
+def _remove_existing_photo(removed_key, image_path):
+    """수정 화면에서만 사진을 숨김. 실제 DB 삭제는 저장할 때 처리."""
+    removed = st.session_state[removed_key]
+    if image_path not in removed:
+        removed.append(image_path)
+
+
+def _restore_existing_photos(removed_key):
+    """저장 전 삭제 예약한 사진을 모두 되돌림."""
+    st.session_state[removed_key] = []
+
+
 def _finish_edit(item_id, version):
     """수정 관련 입력 상태를 정리하고 상세보기로 돌아갈 준비."""
     st.session_state.pop(f"edit_tags_{item_id}_{version}", None)
+    st.session_state.pop(f"edit_removed_{item_id}_{version}", None)
     st.session_state.pop("edit_tag_message", None)
     st.session_state["edit_form_version"] = version + 1
     st.session_state["editing_item_id"] = None
@@ -181,8 +194,7 @@ def render_edit_item(item_id):
         if not item:
             st.warning("게시글을 찾을 수 없습니다.")
             return
-        user_id = st.session_state.get("user_id")
-        if not user_id or str(item.get("user_id")) != str(user_id):
+        if str(item.get("user_id")) != str(st.session_state.get("user_id")):
             st.error("본인이 작성한 게시글만 수정할 수 있습니다.")
             return
         old_paths = get_item_images(item_id, client)
@@ -194,7 +206,10 @@ def render_edit_item(item_id):
     version = st.session_state.get("edit_form_version", 0)
     key = f"edit_{item_id}_{version}"
     tags_key = f"edit_tags_{item_id}_{version}"
+    removed_key = f"edit_removed_{item_id}_{version}"
     input_key = f"{key}_tag_input"
+    if removed_key not in st.session_state:
+        st.session_state[removed_key] = []
     if tags_key not in st.session_state:
         old_tags = item.get("tags") or []
         st.session_state[tags_key] = list(old_tags) if isinstance(old_tags, list) else [str(old_tags)]
@@ -233,24 +248,50 @@ def render_edit_item(item_id):
             with photo_col:
                 st.markdown('<div class="register-label">물품 사진</div>', unsafe_allow_html=True)
                 st.caption(f"최대 {MAX_PHOTOS}장 · 사진당 5MB 이하")
-                st.markdown("**기존 사진**")
-                removed_paths = []
-                if not old_paths:
-                    st.info("기존에 등록된 사진이 없습니다.")
-                for i, path in enumerate(old_paths):
-                    with st.container(border=True):
-                        try:
-                            signed_url = get_signed_image_url(client, path)
-                            if signed_url:
-                                st.image(signed_url, use_container_width=True)
-                            else:
-                                st.caption("사진 미리보기를 표시할 수 없습니다.")
-                        except Exception:
-                            st.caption("사진 미리보기를 표시할 수 없습니다.")
-                        if st.checkbox(
-                            f"사진 {i + 1} 삭제", key=f"{key}_remove_{i}"
-                        ):
-                            removed_paths.append(path)
+                # 기존 등록 화면처럼 사진 3열 미리보기 + X 버튼
+                removed_paths = st.session_state[removed_key]
+                visible_paths = [
+                    path for path in old_paths if path not in removed_paths
+                ]
+
+                st.markdown(f"**기존 사진 ({len(visible_paths)}장)**")
+                if not visible_paths:
+                    st.info("현재 표시할 기존 사진이 없습니다.")
+                else:
+                    preview_cols = st.columns(3, gap="small")
+                    for i, path in enumerate(visible_paths):
+                        photo_key = sha256(path.encode("utf-8")).hexdigest()[:16]
+                        with preview_cols[i % 3]:
+                            with st.container(key=f"register_tile_{key}_{photo_key}"):
+                                try:
+                                    signed_url = get_signed_image_url(client, path)
+                                    if signed_url:
+                                        st.image(signed_url, use_container_width=True)
+                                    else:
+                                        st.caption("사진 미리보기를 표시할 수 없습니다.")
+                                except Exception:
+                                    st.caption("사진 미리보기를 표시할 수 없습니다.")
+
+                                with st.container(key=f"photo_delete_{key}_{photo_key}"):
+                                    st.button(
+                                        "×",
+                                        key=f"edit_delete_{key}_{photo_key}",
+                                        help="이 사진 삭제 예약",
+                                        on_click=_remove_existing_photo,
+                                        args=(removed_key, path),
+                                    )
+
+                if removed_paths:
+                    st.caption(
+                        f"기존 사진 {len(removed_paths)}장 삭제 예정 "
+                        "(아직 DB에서 삭제되지 않았습니다.)"
+                    )
+                    st.button(
+                        "삭제 취소 (모두 되돌리기)",
+                        key=f"{key}_undo_photos",
+                        on_click=_restore_existing_photos,
+                        args=(removed_key,),
+                    )
 
                 st.markdown("**사진 추가**")
                 with st.container(key="register_uploader"):
@@ -364,7 +405,11 @@ def render_edit_item(item_id):
                     st.error(f"수정 도중 오류가 발생했습니다: {exc}")
                 else:
                     # 검색 화면에 유지 중인 결과도 함께 갱신
-                    st.session_state.pop("search_results", None)
+                    results = st.session_state.get("search_results")
+                    if isinstance(results, list):
+                        for row in results:
+                            if str(row.get("id")) == str(item_id):
+                                row.update(item_data)
                     _finish_edit(item_id, version)
                     st.session_state["edit_saved"] = True
                     st.session_state["edit_warnings"] = warnings
