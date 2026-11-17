@@ -3,6 +3,11 @@ from pathlib import Path
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from DB.database import get_supabase_client
+import time
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 # ==========================================
 # 1. CSS 파일 불러오기
@@ -24,6 +29,9 @@ def init_chat_state():
     if "selected_room" not in st.session_state:
         st.session_state.selected_room = None
 
+    if "chat_send_error" not in st.session_state:
+        st.session_state.chat_send_error = None
+
 
 # ==========================================
 # 3. 날짜 및 시간 변환
@@ -39,6 +47,7 @@ def format_timestamp(timestamp):
         )
         dt = dt.astimezone(ZoneInfo("Asia/Seoul"))
         return dt.strftime("%m/%d %H:%M")
+
     except (ValueError, TypeError):
         return str(timestamp)
 
@@ -48,12 +57,12 @@ def format_timestamp(timestamp):
 # ==========================================
 
 def get_my_chat_rooms():
-    supabase = get_supabase_client()
-
     user_id = st.session_state.get("user_id")
 
     if not user_id:
         return []
+
+    supabase = get_supabase_client()
 
     response = (
         supabase.table("chat_rooms")
@@ -72,8 +81,10 @@ def get_my_chat_rooms():
 # 5. 채팅방 정보 및 메시지 조회
 # ==========================================
 
-def get_room_info(room_id):
-    supabase = get_supabase_client()
+def get_room_info(room_id, supabase=None):
+    if supabase is None:
+        supabase = get_supabase_client()
+
     user_id = str(st.session_state.get("user_id"))
 
     response = (
@@ -88,7 +99,7 @@ def get_room_info(room_id):
 
     room = response.data[0]
 
-    # 현재 사용자가 이 방의 참여자인지 확인
+    # 현재 사용자가 채팅방 참여자인지 확인
     participants = [
         str(room["user1_id"]),
         str(room["user2_id"]),
@@ -100,16 +111,18 @@ def get_room_info(room_id):
     return room
 
 
-
 def get_room_messages(room_id):
+
+    # Supabase 클라이언트 재사용
+    supabase = get_supabase_client()
+
     # 채팅방 참여 여부 확인
-    room = get_room_info(room_id)
+    room = get_room_info(room_id, supabase)
 
     if not room:
         raise PermissionError("접근할 수 없는 채팅방입니다.")
 
-    supabase = get_supabase_client()
-
+    # 메시지 조회
     response = (
         supabase.table("chats")
         .select("*")
@@ -119,7 +132,6 @@ def get_room_messages(room_id):
     )
 
     return response.data
-
 
 
 def get_item_title(item_id):
@@ -143,14 +155,31 @@ def get_item_title(item_id):
 # ==========================================
 
 def send_message(room_id, message):
+
+    # 메시지 입력 검사
+    if not isinstance(message, str) or not message.strip():
+        raise ValueError("메시지를 입력해 주세요.")
+
+    user_id = st.session_state.get("user_id")
+
+    if not user_id:
+        raise PermissionError("로그인이 필요합니다.")
+
+    user_id = str(user_id)
+    message = message.strip()
+
+    # Supabase 클라이언트 생성 시간 측정
+    start = time.perf_counter()
     supabase = get_supabase_client()
+    print(f"클라이언트 생성: {time.perf_counter() - start:.3f}초")
 
-    user_id = str(st.session_state.get("user_id"))
-
-    room = get_room_info(room_id)
+    # 채팅방 정보 조회 시간 측정
+    start = time.perf_counter()
+    room = get_room_info(room_id, supabase)
+    print(f"채팅방 조회: {time.perf_counter() - start:.3f}초")
 
     if not room:
-        raise ValueError("참여 중인 채팅방이 아닙니다.")
+        raise PermissionError("참여 중인 채팅방이 아닙니다.")
 
     # 상대방 UUID 확인
     if user_id == str(room["user1_id"]):
@@ -158,7 +187,9 @@ def send_message(room_id, message):
     else:
         receiver_id = room["user1_id"]
 
-    # Supabase에 메시지 저장
+    # 메시지 저장 시간 측정
+    start = time.perf_counter()
+
     response = (
         supabase.table("chats")
         .insert({
@@ -170,7 +201,31 @@ def send_message(room_id, message):
         .execute()
     )
 
+    print(f"메시지 INSERT: {time.perf_counter() - start:.3f}초")
+
     return response.data
+
+
+# ==========================================
+# 메시지 전송 콜백
+# ==========================================
+
+def submit_chat_message(room_id):
+
+    message = st.session_state.get("chat_message_input")
+
+    if not message or not message.strip():
+        return
+
+    try:
+        send_message(room_id, message.strip())
+        st.session_state.chat_send_error = None
+
+    except Exception:
+        logger.exception("메시지 전송 실패")
+        st.session_state.chat_send_error = (
+            "메시지 전송에 실패했습니다. 다시 시도해 주세요."
+        )
 
 
 # ==========================================
@@ -211,7 +266,7 @@ def render_chat_list():
                 room["created_at"]
             )
 
-        # 기존 UI 유지
+        # 기존 채팅방 목록 UI 유지
         button_label = (
             f"**{title}**\n\n"
             f"{message}\n\n"
@@ -224,7 +279,9 @@ def render_chat_list():
             use_container_width=True,
         ):
             st.session_state.selected_room = room_id
+            st.session_state.chat_send_error = None
             st.rerun()
+
 
 # ==========================================
 # 메시지 자동 갱신
@@ -237,10 +294,12 @@ def render_messages(room_id):
         messages = get_room_messages(room_id)
         my_id = str(st.session_state.get("user_id"))
 
+        # 메시지가 없는 경우
         if not messages:
             st.info("아직 메시지가 없습니다. 첫 메시지를 보내보세요!")
             return
 
+        # 메시지 표시
         for chat in messages:
 
             is_me = str(chat["user_id"]) == my_id
@@ -262,7 +321,9 @@ def render_messages(room_id):
         st.warning("채팅 메시지에 접근할 수 없습니다.")
 
     except Exception:
+        logger.exception("채팅 메시지 조회 실패")
         st.error("메시지를 불러오지 못했습니다.")
+
 
 # ==========================================
 # 8. 채팅방 상세 화면
@@ -277,39 +338,40 @@ def render_chat_room(room_id):
 
         if st.button("채팅 목록으로"):
             st.session_state.selected_room = None
+            st.session_state.chat_send_error = None
             st.rerun()
+
         return
 
+    # 게시글 제목
     item_title = get_item_title(room["item_id"])
 
     # 뒤로가기
     if st.button("← 채팅 목록"):
         st.session_state.selected_room = None
+        st.session_state.chat_send_error = None
         st.rerun()
+        return
 
+    # 채팅방 제목
     st.subheader(f"{item_title}의 채팅방")
     st.divider()
 
     # 메시지 자동 갱신
     render_messages(room_id)
 
-    # 메시지 입력
-    new_message = st.chat_input("메시지를 입력하세요.")
+    # 메시지 전송 오류 표시
+    if st.session_state.get("chat_send_error"):
+        st.error(st.session_state.chat_send_error)
 
-    if new_message and new_message.strip():
-        try:
-            send_message(
-                room_id,
-                new_message.strip()
-            )
+    # 메시지 입력창 (하단 고정)
+    st.chat_input(
+        "메시지를 입력하세요.",
+        key="chat_message_input",
+        on_submit=submit_chat_message,
+        args=(room_id,),
+    )
 
-        except Exception as e:
-            print(f"[채팅 전송 오류] {type(e).__name__}: {e}")
-            st.error(
-                "메시지 전송에 실패했습니다. 다시 시도해 주세요."
-            )
-        else:
-            st.rerun()
 
 # ==========================================
 # 9. 채팅 메인 함수
@@ -318,7 +380,6 @@ def render_chat_room(room_id):
 def render_chat():
 
     init_chat_state()
-
     load_chat_css()
 
     try:
@@ -329,5 +390,6 @@ def render_chat():
         else:
             render_chat_room(selected_room)
 
-    except Exception as e:
-        st.error(f"채팅 데이터 조회 실패: {e}")
+    except Exception:
+        logger.exception("채팅 데이터 조회 실패")
+        st.error("채팅 데이터를 불러오지 못했습니다.")
