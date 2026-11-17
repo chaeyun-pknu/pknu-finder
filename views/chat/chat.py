@@ -133,6 +133,20 @@ def get_room_messages(room_id):
 
     return response.data
 
+def get_last_message(room_id, supabase):
+    response = (
+        supabase.table("chats")
+        .select("message, timestamp")
+        .eq("room_id", room_id)
+        .order("timestamp", desc=True)
+        .limit(1)
+        .execute()
+    )
+
+    if response.data:
+        return response.data[0]
+
+    return None
 
 def get_item_title(item_id):
     supabase = get_supabase_client()
@@ -235,7 +249,6 @@ def submit_chat_message(room_id):
 def render_chat_list():
     st.title("채팅")
     st.caption("분실물과 습득물에 관한 대화를 확인하세요.")
-
     st.divider()
 
     rooms = get_my_chat_rooms()
@@ -244,18 +257,29 @@ def render_chat_list():
         st.info("참여 중인 채팅방이 없습니다.")
         return
 
+    # 클라이언트 한 번 생성하여 재사용
+    supabase = get_supabase_client()
+
     for room in rooms:
         room_id = room["id"]
         item_id = room["item_id"]
 
-        # 게시글 제목 조회
-        title = get_item_title(item_id)
+        title_response = (
+            supabase.table("lost_items")
+            .select("title")
+            .eq("id", item_id)
+            .execute()
+        )
 
-        # 마지막 메시지 조회
-        messages = get_room_messages(room_id)
+        if title_response.data:
+            title = title_response.data[0]["title"]
+        else:
+            title = f"게시글 #{item_id}"
 
-        if messages:
-            last_chat = messages[-1]
+        # 마지막 메시지 한 개만 조회
+        last_chat = get_last_message(room_id, supabase)
+
+        if last_chat:
             message = last_chat["message"]
             timestamp = format_timestamp(
                 last_chat["timestamp"]
@@ -266,7 +290,6 @@ def render_chat_list():
                 room["created_at"]
             )
 
-        # 기존 채팅방 목록 UI 유지
         button_label = (
             f"**{title}**\n\n"
             f"{message}\n\n"
