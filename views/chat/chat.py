@@ -100,7 +100,14 @@ def get_room_info(room_id):
     return room
 
 
+
 def get_room_messages(room_id):
+    # 채팅방 참여 여부 확인
+    room = get_room_info(room_id)
+
+    if not room:
+        raise PermissionError("접근할 수 없는 채팅방입니다.")
+
     supabase = get_supabase_client()
 
     response = (
@@ -112,6 +119,7 @@ def get_room_messages(room_id):
     )
 
     return response.data
+
 
 
 def get_item_title(item_id):
@@ -284,8 +292,8 @@ def render_chat_room(room_id):
             )
             st.rerun()
 
-        except Exception as e:
-            st.error(f"메시지 전송 실패: {e}")
+        except Exception:
+            st.error("메시지 전송에 실패했습니다. 다시 시도해주세요")
 
 
 # ==========================================
