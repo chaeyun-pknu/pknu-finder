@@ -3,27 +3,19 @@ from pathlib import Path
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from DB.database import get_supabase_client
-import time
 import logging
 
 logger = logging.getLogger(__name__)
 
-
-# ==========================================
 # 1. CSS 파일 불러오기
-# ==========================================
 
 CSS_PATH = Path(__file__).parent / "chat.css"
-
 
 def load_chat_css():
     with open(CSS_PATH, encoding="utf-8") as f:
         st.html(f"<style>{f.read()}</style>")
 
-
-# ==========================================
 # 2. 세션 상태 초기화
-# ==========================================
 
 def init_chat_state():
     if "selected_room" not in st.session_state:
@@ -32,10 +24,7 @@ def init_chat_state():
     if "chat_send_error" not in st.session_state:
         st.session_state.chat_send_error = None
 
-
-# ==========================================
 # 3. 날짜 및 시간 변환
-# ==========================================
 
 def format_timestamp(timestamp):
     if not timestamp:
@@ -51,10 +40,7 @@ def format_timestamp(timestamp):
     except (ValueError, TypeError):
         return str(timestamp)
 
-
-# ==========================================
 # 4. 내가 참여한 채팅방 조회
-# ==========================================
 
 def get_my_chat_rooms():
     user_id = st.session_state.get("user_id")
@@ -76,10 +62,7 @@ def get_my_chat_rooms():
 
     return response.data
 
-
-# ==========================================
 # 5. 채팅방 정보 및 메시지 조회
-# ==========================================
 
 def get_room_info(room_id, supabase=None):
     if supabase is None:
@@ -109,7 +92,6 @@ def get_room_info(room_id, supabase=None):
         return None
 
     return room
-
 
 def get_room_messages(room_id):
 
@@ -163,10 +145,7 @@ def get_item_title(item_id):
 
     return f"게시글 #{item_id}"
 
-
-# ==========================================
 # 6. 메시지 저장
-# ==========================================
 
 def send_message(room_id, message):
 
@@ -182,15 +161,11 @@ def send_message(room_id, message):
     user_id = str(user_id)
     message = message.strip()
 
-    # Supabase 클라이언트 생성 시간 측정
-    start = time.perf_counter()
+    # Supabase 클라이언트 생성
     supabase = get_supabase_client()
-    print(f"클라이언트 생성: {time.perf_counter() - start:.3f}초")
 
-    # 채팅방 정보 조회 시간 측정
-    start = time.perf_counter()
+    # 채팅방 정보 조회
     room = get_room_info(room_id, supabase)
-    print(f"채팅방 조회: {time.perf_counter() - start:.3f}초")
 
     if not room:
         raise PermissionError("참여 중인 채팅방이 아닙니다.")
@@ -201,9 +176,7 @@ def send_message(room_id, message):
     else:
         receiver_id = room["user1_id"]
 
-    # 메시지 저장 시간 측정
-    start = time.perf_counter()
-
+    # 메시지 저장
     response = (
         supabase.table("chats")
         .insert({
@@ -215,36 +188,9 @@ def send_message(room_id, message):
         .execute()
     )
 
-    print(f"메시지 INSERT: {time.perf_counter() - start:.3f}초")
-
     return response.data
 
-
-# ==========================================
-# 메시지 전송 콜백
-# ==========================================
-
-def submit_chat_message(room_id):
-
-    message = st.session_state.get("chat_message_input")
-
-    if not message or not message.strip():
-        return
-
-    try:
-        send_message(room_id, message.strip())
-        st.session_state.chat_send_error = None
-
-    except Exception:
-        logger.exception("메시지 전송 실패")
-        st.session_state.chat_send_error = (
-            "메시지 전송에 실패했습니다. 다시 시도해 주세요."
-        )
-
-
-# ==========================================
 # 7. 채팅 목록 화면
-# ==========================================
 
 def render_chat_list():
     st.title("채팅")
@@ -306,9 +252,7 @@ def render_chat_list():
             st.rerun()
 
 
-# ==========================================
 # 메시지 자동 갱신
-# ==========================================
 
 @st.fragment(run_every="3s")
 def render_messages(room_id):
@@ -348,9 +292,7 @@ def render_messages(room_id):
         st.error("메시지를 불러오지 못했습니다.")
 
 
-# ==========================================
 # 8. 채팅방 상세 화면
-# ==========================================
 
 def render_chat_room(room_id):
 
@@ -395,10 +337,7 @@ def render_chat_room(room_id):
         args=(room_id,),
     )
 
-
-# ==========================================
 # 9. 채팅 메인 함수
-# ==========================================
 
 def render_chat():
 
