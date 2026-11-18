@@ -11,6 +11,7 @@ import streamlit as st
 from DB.database import get_supabase_client
 from views.mypage.bookmark import *
 from views.common.util import *
+from views.chat.chat import get_or_create_chat_room
 
 #===============================
 # CSS 불러오기
@@ -274,13 +275,30 @@ def show_item_detail(item_id):
 
             st.write("")
 
-            # 채팅 버튼 - 현재 기존 상태 유지
+            # 채팅 버튼
             with st.container(key="detail_chat_area"):
-                st.button(
+                if st.button(
                     "채팅하기",
                     key=f"detail_chat_{item['id']}",
                     type="primary",
                     use_container_width=True,
-                    disabled=True,
-                    help="채팅 기능 연동 후 활성화됩니다.",
-                )
+                ):
+                    try:
+                        room_id = get_or_create_chat_room(
+                            item["id"],
+                            item["user_id"]
+                        )
+
+                        st.session_state.selected_room = room_id
+                        st.session_state.current_menu = "채팅"
+                        st.session_state.menu_radio = "채팅"
+                        st.rerun()
+
+                    except ValueError as e:
+                        st.warning(str(e))
+
+                    except Exception:
+                        st.error(
+                            "채팅방을 생성하지 못했습니다. 다시 시도해 주세요."
+                        )
+

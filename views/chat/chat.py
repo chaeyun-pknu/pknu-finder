@@ -93,6 +93,58 @@ def get_room_info(room_id, supabase=None):
 
     return room
 
+
+def get_or_create_chat_room(item_id, owner_id):
+    my_id = st.session_state.get("user_id")
+
+    if not my_id:
+        raise PermissionError("로그인이 필요합니다.")
+
+    if not owner_id:
+        raise ValueError("게시글 작성자를 확인할 수 없습니다.")
+
+    my_id = str(my_id)
+    owner_id = str(owner_id)
+
+    if my_id == owner_id:
+        raise ValueError("본인 게시글에는 채팅할 수 없습니다.")
+
+    supabase = get_supabase_client()
+
+    # 기존 채팅방 확인
+    response = (
+        supabase.table("chat_rooms")
+        .select("id, user1_id, user2_id")
+        .eq("item_id", item_id)
+        .or_(
+            f"user1_id.eq.{my_id},user2_id.eq.{my_id}"
+        )
+        .execute()
+    )
+
+    for room in response.data:
+        participants = {
+            str(room["user1_id"]),
+            str(room["user2_id"])
+        }
+
+        if participants == {my_id, owner_id}:
+            return room["id"]
+
+    # 기존 채팅방이 없으면 새로 생성
+    response = (
+        supabase.table("chat_rooms")
+        .insert({
+            "item_id": item_id,
+            "user1_id": my_id,
+            "user2_id": owner_id,
+        })
+        .execute()
+    )
+
+    return response.data[0]["id"]
+
+
 def get_room_messages(room_id):
 
     # Supabase 클라이언트 재사용
@@ -189,6 +241,25 @@ def send_message(room_id, message):
     )
 
     return response.data
+
+
+# 메시지 전송 콜백
+def submit_chat_message(room_id):
+    message = st.session_state.get("chat_message_input")
+
+    if not message or not message.strip():
+        return
+
+    try:
+        send_message(room_id, message.strip())
+        st.session_state.chat_send_error = None
+
+    except Exception:
+        logger.exception("메시지 전송 실패")
+        st.session_state.chat_send_error = (
+            "메시지 전송에 실패했습니다. 다시 시도해 주세요."
+        )
+
 
 # 7. 채팅 목록 화면
 
