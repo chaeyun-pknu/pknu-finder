@@ -154,7 +154,6 @@ def render_selected_page(menu: str) -> None:
 
     else:
         st.warning("선택한 메뉴를 찾을 수 없습니다.")
-    
 
 
 # ==========================================
@@ -162,7 +161,7 @@ def render_selected_page(menu: str) -> None:
 # ==========================================
 
 def render_app() -> None:
-    
+
     # 사이드바 메뉴
     st.sidebar.title("PKNU Finder")
     st.sidebar.markdown("---")
@@ -192,6 +191,16 @@ def render_app() -> None:
                 )
                 st.session_state.selected_item_id = None
 
+            st.rerun()
+
+    # 개별 채팅방: 사이드바 메뉴 대신 채팅 목록 복귀 버튼 표시
+    elif (
+        current_menu == "채팅"
+        and st.session_state.get("selected_room") is not None
+    ):
+        if st.sidebar.button("← 채팅 목록으로 돌아가기", width="stretch"):
+            st.session_state["selected_room"] = None
+            st.session_state["chat_send_error"] = None
             st.rerun()
 
     else:
@@ -246,7 +255,6 @@ def render_app() -> None:
 
     # 선택한 메뉴 실행
     render_selected_page(st.session_state.current_menu)
-
 
 
 # ==========================================
