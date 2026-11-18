@@ -3,9 +3,8 @@ from views.search.search_service import search_items
 from DB.database import get_supabase_client
 
 from views.register.detail import (
-    show_item_detail,
     get_item_images,
-    get_signed_image_url
+    get_signed_image_url,
 )
 
 
@@ -61,19 +60,6 @@ def clear_search_filters():
 # ==========================================
 
 def render_search():
-
-     # 상세 페이지 진입 여부 확인
-    if st.session_state.get("selected_item_id"):
-
-        if st.button("← 검색 결과로 돌아가기"):
-            st.session_state.pop("selected_item_id")
-            st.rerun()
-
-        show_item_detail(
-            st.session_state["selected_item_id"]
-        )
-
-        return
 
     st.title("분실물 / 습득물 검색")
 
@@ -198,7 +184,7 @@ def render_search():
                 st.session_state["search_results"] = results
 
             except Exception as e:
-                
+
                 print(f"검색 오류: {e}")
 
                 st.error(
@@ -207,7 +193,7 @@ def render_search():
                 )
 
                 return
-            
+
     # 8. 검색 결과 표시
     if "search_results" in st.session_state:
 
@@ -288,10 +274,12 @@ def render_search():
                             item.get("description", "설명 없음")
                         )
 
-                        # 상세보기 버튼
+                        # 홈·마이페이지와 동일한 공통 상세보기 화면으로 이동
                         if st.button(
                             "상세보기",
                             key=f"search_detail_{item['id']}"
                         ):
                             st.session_state["selected_item_id"] = item["id"]
+                            st.session_state["previous_menu"] = "분실물/습득물 검색"
+                            st.session_state["current_menu"] = "게시글 상세보기"
                             st.rerun()
