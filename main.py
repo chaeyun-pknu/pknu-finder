@@ -7,6 +7,7 @@ from DB.database import (
     init_db,
 )
 from views.register.detail import show_item_detail
+from views.register.edit import _finish_edit
 
 # 각 화면 연결
 from views.home.home import render_home
@@ -168,16 +169,29 @@ def render_app() -> None:
 
     current_menu = st.session_state.get("current_menu", "홈")
 
-    # 상세 페이지에서는 사이드바 메뉴를 표시하지 않고
-    # 기존 메뉴 상태를 유지한다.
+    # 상세보기/수정 화면에서는 기존 메뉴 대신 뒤로가기 버튼만 표시
     if current_menu == "게시글 상세보기":
         if st.sidebar.button("← 이전 화면으로 돌아가기", width="stretch"):
-            previous_menu = st.session_state.get(
-                "previous_menu", "홈"
-            )
+            item_id = st.session_state.get("selected_item_id")
+            editing_item_id = st.session_state.get("editing_item_id")
 
-            st.session_state.current_menu = previous_menu
-            st.session_state.selected_item_id = None
+            # 수정 화면에서는 해당 게시글의 상세보기로 한 단계 복귀
+            if (
+                item_id is not None
+                and editing_item_id is not None
+                and str(editing_item_id) == str(item_id)
+            ):
+                _finish_edit(
+                    item_id,
+                    st.session_state.get("edit_form_version", 0),
+                )
+            else:
+                # 상세보기에서는 기존 진입 메뉴(홈/마이페이지)로 복귀
+                st.session_state.current_menu = st.session_state.get(
+                    "previous_menu", "홈"
+                )
+                st.session_state.selected_item_id = None
+
             st.rerun()
 
     else:
