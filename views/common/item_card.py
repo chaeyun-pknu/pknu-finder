@@ -6,19 +6,12 @@ from views.mypage.bookmark import (
     register_bookmark,
     delete_bookmark,
 )
+from views.common.util import *
 
 # ============================================
 # CSS 불러오기
 # ============================================
-def load_item_card_css():
-    css_path = Path(__file__).parent / "item_card.css"
-
-    if css_path.exists():
-        with open(css_path, "r", encoding="utf-8") as f:
-            st.markdown(
-                f"<style>{f.read()}</style>",
-                unsafe_allow_html=True,
-            )
+css_path = Path(__file__).parent / "item_card.css"
 
 # ===========================================
 # 게시글 카드 렌더링
@@ -73,7 +66,7 @@ def render_item_card(
         key_prefix: Streamlit 버튼 및 컨테이너 고유 키 구분
     """
 
-    load_item_card_css()
+    load_css(css_path)
 
     item_id = item["id"]
 

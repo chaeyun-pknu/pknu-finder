@@ -208,6 +208,10 @@ def logout_user() -> None:
     st.session_state.pop("oauth_flows", None)
     st.session_state.pop("supabase_access_token", None)
     st.session_state.pop("supabase_refresh_token", None)
+    # Supabase 클라이언트 캐시 제거
+    st.session_state.pop("_supabase_user_client", None)
+    st.session_state.pop("_supabase_auth_client", None)
+    st.session_state.pop("_supabase_client_access_token", None)
     st.rerun()
 
 # 이메일 로그인 처리

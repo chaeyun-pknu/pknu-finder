@@ -1,7 +1,7 @@
 import streamlit as st
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
-
+from views.common.util import *
 from DB.database import get_supabase_client
 from views.common.item_card import render_item_card
 
@@ -9,24 +9,14 @@ from views.common.item_card import render_item_card
 # --------------------------------------------------
 # CSS 불러오기
 # --------------------------------------------------
-
-def load_home_css():
-    css_path = Path(__file__).parent / "home.css"
-
-    if css_path.exists():
-        with open(css_path, "r", encoding="utf-8") as file:
-            st.markdown(
-                f"<style>{file.read()}</style>",
-                unsafe_allow_html=True
-            )
-
+css_path = Path(__file__).parent / "home.css"
 
 # --------------------------------------------------
 # 홈 화면
 # --------------------------------------------------
 
 def render_home() -> None:
-    load_home_css()
+    load_css(css_path)
 
     # 메인 소개 영역
     st.markdown(
