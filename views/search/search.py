@@ -7,6 +7,8 @@ from views.register.detail import (
     get_signed_image_url,
 )
 
+from views.common.location_options import ALL_LOCATIONS
+
 
 # ==========================================
 # 검색 필터 옵션
@@ -25,17 +27,10 @@ ITEM_CATEGORIES = [
 ]
 
 # 장소 선택 옵션
-# 등록 화면은 자유 입력이므로 실제 등록 장소에 맞게 조정 가능
+# 검색 필터 장소 옵션
 ITEM_LOCATIONS = [
     "전체",
-    "중앙도서관",
-    "공학관",
-    "인문사회관",
-    "학생회관",
-    "기숙사",
-    "강의실",
-    "식당",
-    "운동장",
+    *ALL_LOCATIONS
 ]
 
 
@@ -97,11 +92,47 @@ def render_search():
             key="search_category"
         )
 
-        location = st.selectbox(
-            "장소",
-            ITEM_LOCATIONS,
-            key="search_location"
-        )
+        from views.common.location_options import AREA_LOCATIONS
+
+        # 장소 필터
+        with st.container(border=True):
+            st.markdown("### 장소 필터")
+
+            # 1단계: 구역 선택
+            st.caption("1단계 · 구역 선택")
+
+            area_options = ["전체"] + list(AREA_LOCATIONS.keys())
+
+            selected_area = st.radio(
+                "구역 선택",
+                area_options,
+                horizontal=True,
+                label_visibility="collapsed",
+                key="search_area"
+            )
+
+            st.divider()
+
+            # 2단계: 세부 장소 선택
+            st.caption("2단계 · 세부 장소 선택")
+
+            if selected_area == "전체":
+                location_options = ["전체"]
+            else:
+                location_options = [
+                    "전체",
+                    *AREA_LOCATIONS[selected_area]
+                ]
+
+            selected_location = st.selectbox(
+                "세부 장소 선택",
+                location_options,
+                key="search_location",
+                label_visibility="collapsed"
+            )
+
+        # 검색 서비스에 전달할 장소
+        location = selected_location
 
         date_range = st.date_input(
             "날짜 범위",

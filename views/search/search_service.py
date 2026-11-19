@@ -48,27 +48,11 @@ def search_items(
     if category != "전체":
         query = query.eq("category", category)
 
+
     # 4. 장소 필터
-    LOCATION_KEYWORDS = {
-        "중앙도서관": ["중앙도서관", "중도"],
-        "공학관": ["공학관"],
-        "인문사회관": ["인문사회관"],
-        "학생회관": ["학생회관"],
-        "기숙사": ["기숙사"],
-        "강의실": ["강의실"],
-        "식당": ["식당"],
-        "운동장": ["운동장"],
-    }
-
     if location != "전체":
-        keywords = LOCATION_KEYWORDS.get(location, [location])
-
-        location_conditions = ",".join(
-            f"location.ilike.%{word}%"
-            for word in keywords
-        )
-
-        query = query.or_(location_conditions)
+        query = query.eq("location", location)
+    
 
     # 5. 시작 날짜 필터
     if start_date is not None:
