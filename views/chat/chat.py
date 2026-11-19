@@ -382,13 +382,6 @@ def render_chat_room(room_id):
     # 게시글 제목
     item_title = get_item_title(room["item_id"])
 
-    # 뒤로가기
-    if st.button("← 채팅 목록"):
-        st.session_state.selected_room = None
-        st.session_state.chat_send_error = None
-        st.rerun()
-        return
-
     # 채팅방 제목
     st.subheader(f"{item_title}의 채팅방")
     st.divider()
