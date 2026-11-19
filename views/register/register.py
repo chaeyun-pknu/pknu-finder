@@ -5,7 +5,7 @@ from pathlib import Path
 from datetime import date
 from uuid import uuid4
 from hashlib import sha256
-from views.common.location_options import AREA_LOCATIONS
+from views.common.util import AREA_LOCATIONS, ALL_LOCATIONS
 
 
 # ==========================================

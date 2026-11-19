@@ -1,3 +1,4 @@
+
 import streamlit as st
 from views.search.search_service import search_items
 from DB.database import get_supabase_client
@@ -7,7 +8,7 @@ from views.register.detail import (
     get_signed_image_url,
 )
 
-from views.common.location_options import ALL_LOCATIONS
+from views.common.util import AREA_LOCATIONS, ALL_LOCATIONS
 
 
 # ==========================================
@@ -26,13 +27,6 @@ ITEM_CATEGORIES = [
     "기타",
 ]
 
-# 장소 선택 옵션
-# 검색 필터 장소 옵션
-ITEM_LOCATIONS = [
-    "전체",
-    *ALL_LOCATIONS
-]
-
 
 # ==========================================
 # 검색 조건 초기화
@@ -43,11 +37,17 @@ def clear_search_filters():
     st.session_state["search_input"] = ""
     st.session_state["search_type"] = "전체"
     st.session_state["search_category"] = "전체"
+    st.session_state["search_area"] = "전체"
     st.session_state["search_location"] = "전체"
     st.session_state["search_date_range"] = ()
 
     st.session_state.pop("search_results", None)
     st.session_state.pop("search_request", None)
+
+
+# 구역 변경 시 세부 장소 초기화
+def reset_search_location():
+    st.session_state["search_location"] = "전체"
 
 
 # ==========================================
@@ -86,16 +86,16 @@ def render_search():
     # 3. 검색 조건 필터
     with st.expander("검색 조건 필터"):
 
+        # 카테고리 선택
         category = st.selectbox(
             "카테고리",
             ITEM_CATEGORIES,
             key="search_category"
         )
 
-        from views.common.location_options import AREA_LOCATIONS
-
         # 장소 필터
         with st.container(border=True):
+
             st.markdown("### 장소 필터")
 
             # 1단계: 구역 선택
@@ -108,7 +108,8 @@ def render_search():
                 area_options,
                 horizontal=True,
                 label_visibility="collapsed",
-                key="search_area"
+                key="search_area",
+                on_change=reset_search_location
             )
 
             st.divider()
@@ -117,8 +118,11 @@ def render_search():
             st.caption("2단계 · 세부 장소 선택")
 
             if selected_area == "전체":
-                location_options = ["전체"]
+                # 전체 구역 선택 시 모든 장소 표시
+                location_options = ["전체", *ALL_LOCATIONS]
+
             else:
+                # 특정 구역 선택 시 해당 구역 장소만 표시
                 location_options = [
                     "전체",
                     *AREA_LOCATIONS[selected_area]
@@ -131,9 +135,7 @@ def render_search():
                 label_visibility="collapsed"
             )
 
-        # 검색 서비스에 전달할 장소
-        location = selected_location
-
+        # 날짜 범위 선택
         date_range = st.date_input(
             "날짜 범위",
             value=(),
@@ -151,7 +153,7 @@ def render_search():
     elif len(date_range) == 1:
         start_date = date_range[0]
 
-    # 5. 초기화 버튼
+    # 5. 검색 조건 초기화 버튼
     st.button(
         "검색 조건 초기화",
         on_click=clear_search_filters
@@ -170,7 +172,8 @@ def render_search():
             not keyword
             and search_type == "전체"
             and category == "전체"
-            and location == "전체"
+            and selected_area == "전체"
+            and selected_location == "전체"
             and start_date is None
             and end_date is None
         ):
@@ -195,7 +198,8 @@ def render_search():
                 "type": search_type,
                 "keyword": keyword,
                 "category": category,
-                "location": location,
+                "area": selected_area,
+                "location": selected_location,
                 "start_date": start_date,
                 "end_date": end_date
             }
@@ -207,7 +211,8 @@ def render_search():
                     keyword=keyword,
                     search_type=search_type,
                     category=category,
-                    location=location,
+                    area=selected_area,
+                    location=selected_location,
                     start_date=start_date,
                     end_date=end_date
                 )
@@ -258,6 +263,7 @@ def render_search():
                             )
 
                             if image_paths:
+
                                 image_url = get_signed_image_url(
                                     supabase,
                                     image_paths[0]
@@ -305,12 +311,14 @@ def render_search():
                             item.get("description", "설명 없음")
                         )
 
-                        # 홈·마이페이지와 동일한 공통 상세보기 화면으로 이동
+                        # 공통 상세보기 화면으로 이동
                         if st.button(
                             "상세보기",
                             key=f"search_detail_{item['id']}"
                         ):
+
                             st.session_state["selected_item_id"] = item["id"]
                             st.session_state["previous_menu"] = "분실물/습득물 검색"
                             st.session_state["current_menu"] = "게시글 상세보기"
+
                             st.rerun()
