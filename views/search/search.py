@@ -8,7 +8,7 @@ from views.register.detail import (
     get_signed_image_url,
 )
 
-from views.common.util import AREA_LOCATIONS, ALL_LOCATIONS
+from views.common.util import *
 
 
 # ==========================================
@@ -247,6 +247,17 @@ def render_search():
 
             supabase = get_supabase_client()
 
+            # 검색 결과의 게시글 ID 수집
+            item_ids = [item["id"] for item in results]
+
+            # 모든 게시글의 첫 번째 이미지 한 번에 조회
+            try:
+                image_map = get_first_item_images(supabase, item_ids)
+            except Exception as e:
+                print(f"검색 이미지 일괄 조회 오류: {e}")
+                image_map = {}
+
+
             for item in results:
 
                 with st.container(border=True):
@@ -255,33 +266,21 @@ def render_search():
 
                     # 이미지 표시
                     with image_col:
-
                         try:
-                            image_paths = get_item_images(
-                                item["id"],
-                                supabase
-                            )
+                            image_path = image_map.get(item["id"])
 
-                            if image_paths:
-
-                                image_url = get_signed_image_url(
-                                    supabase,
-                                    image_paths[0]
-                                )
+                            if image_path:
+                                image_url = get_signed_image_url(supabase, image_path)
 
                                 if image_url:
-                                    st.image(
-                                        image_url,
-                                        use_container_width=True
-                                    )
+                                    st.image(image_url, use_container_width=True)
                                 else:
                                     st.caption("이미지 없음")
-
                             else:
                                 st.caption("등록된 사진이 없습니다.")
 
                         except Exception as e:
-                            print(f"이미지 조회 오류: {e}")
+                            print(f"이미지 URL 생성 오류: {e}")
                             st.caption("이미지를 불러올 수 없습니다.")
 
                     # 게시글 정보

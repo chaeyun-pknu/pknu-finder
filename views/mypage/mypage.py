@@ -41,36 +41,6 @@ def get_current_user(supabase):
     except Exception:
         return None
 
-#--------------------------------------------------
-# 게시글별 첫 번째 이미지 조회
-#--------------------------------------------------
-def get_item_images(supabase, item_ids):
-    if not item_ids:
-        return {}
-
-    image_map = {}
-
-    try:
-        response = (
-            supabase.table("lost_item_images")
-            .select("*")
-            .in_("lost_item_id", item_ids)
-            .order("created_at")
-            .execute()
-        )
-
-        for image in response.data or []:
-            image_map.setdefault(
-                image.get("lost_item_id"),
-                image.get("image_path")
-            )
-
-    except Exception as e:
-        print(f"게시글 이미지 조회 오류: {e}")
-
-    return image_map
-
-
 # --------------------------------------------------
 # 마이페이지 메인
 # --------------------------------------------------
@@ -299,10 +269,14 @@ def render_bookmark_section(supabase, bookmarks):
             st.info("북마크한 게시글이 없습니다.")
             return
 
-        image_map = get_item_images(
-            supabase,
-            [item["id"] for item in ordered_items]
-        )
+        try:    
+            image_map = get_first_item_images(
+                supabase, 
+                [item["id"] for item in ordered_items[:6]]
+                )
+        except Exception as e:
+            print(f"북마크 이미지 조회 오류: {e}")
+            image_map = {}
 
         # 공통 게시글 카드 사용
         for start in range(0, min(len(ordered_items), 6), 2):
@@ -341,12 +315,16 @@ def render_my_items_section(supabase, my_items):
             st.info("아직 등록한 게시글이 없습니다.")
             return
 
-        display_items = my_items[:6]
+        display_items = my_items
 
-        image_map = get_item_images(
-            supabase,
-            [item["id"] for item in display_items]
-        )
+        try:    
+            image_map = get_first_item_images(
+                        supabase, 
+                        [item["id"] for item in display_items[:6]]
+                        )
+        except Exception as e:
+            print(f"내 게시글 이미지 조회 오류: {e}")
+            image_map = {}
 
         cols = st.columns(2)
 
