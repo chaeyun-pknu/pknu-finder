@@ -3,7 +3,6 @@ from DB.database import get_supabase_client
 from pathlib import Path
 from uuid import uuid4
 
-
 def load_css(css_path):
     if not css_path.exists():
         st.error(f"CSS 파일을 찾을 수 없습니다: {css_path}")
@@ -14,7 +13,6 @@ def load_css(css_path):
             f"<style>{file.read()}</style>",
             unsafe_allow_html=True
         )
-
 
 # 부경대학교 대연캠퍼스 구역별 장소 목록
 AREA_LOCATIONS = {
@@ -92,7 +90,6 @@ AREA_LOCATIONS = {
     ],
 }
 
-
 # 검색 화면에서 사용할 전체 장소 목록
 ALL_LOCATIONS = [
     location
@@ -123,7 +120,6 @@ MAX_DESCRIPTION_LENGTH = 1000
 
 # 등록·수정 화면에서 공통으로 사용하는 이미지 설정
 IMAGE_BUCKET = "lost-item-images"
-
 MIME_TYPES = {
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
@@ -142,7 +138,6 @@ def upload_item_image(supabase, item_id, photo):
 
     image_path = f"{item_id}/{uuid4().hex}{ext}"
     bucket = supabase.storage.from_(IMAGE_BUCKET)
-
     bucket.upload(
         path=image_path,
         file=photo["bytes"],
@@ -169,26 +164,23 @@ def upload_item_image(supabase, item_id, photo):
     except Exception:
         bucket.remove([image_path])
         raise
-
     return image_path
+
 
 
 # 상세·검색·수정 화면에서 공통으로 사용하는 서명 URL
 def get_signed_image_url(supabase, image_path):
     """비공개 Storage 사진 접근용 1시간 유효 URL"""
-
     response = (
         supabase.storage.from_(IMAGE_BUCKET)
         .create_signed_url(image_path, 3600)
     )
-
     if isinstance(response, dict):
         return (
             response.get("signedURL")
             or response.get("signedUrl")
             or response.get("signed_url")
         )
-
     return None
 
 

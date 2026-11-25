@@ -1,8 +1,11 @@
 from DB.database import get_supabase_client
 from views.common.util import (
     AREA_LOCATIONS,
+    ALL_LOCATIONS,
     load_css,
     upload_item_image,
+    IMAGE_BUCKET,
+    MIME_TYPES,
     ITEM_CATEGORIES,
     MAX_PHOTOS,
     MAX_PHOTO_BYTES,
@@ -17,10 +20,6 @@ from datetime import date
 from uuid import uuid4
 from hashlib import sha256
 
-
-# ==========================================
-# 등록 화면에서 사용할 물품 카테고리
-# ==========================================
 
 # ==========================================
 # Supabase 게시글 저장
