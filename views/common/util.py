@@ -213,3 +213,40 @@ def get_item_images(item_id, supabase=None):
         for row in (response.data or [])
         if row.get("image_path")
     ]
+
+
+def get_first_item_images(supabase, item_ids):
+    """
+    여러 게시글의 첫 번째 이미지 경로를 일괄 조회.
+
+    Args:
+        supabase: Supabase 클라이언트
+        item_ids: 게시글 ID 목록
+
+    Returns:
+        dict: {게시글 ID: 첫 번째 이미지 경로}
+    """
+    if not item_ids:
+        return {}
+
+    # 중복 ID 제거
+    item_ids = list(dict.fromkeys(item_ids))
+
+    response = (
+        supabase.table("lost_item_images")
+        .select("lost_item_id, image_path")
+        .in_("lost_item_id", item_ids)
+        .order("id")
+        .execute()
+    )
+
+    image_map = {}
+
+    for image in response.data or []:
+        item_id = image["lost_item_id"]
+        image_path = image.get("image_path")
+
+        if image_path:
+            image_map.setdefault(item_id, image_path)
+
+    return image_map
