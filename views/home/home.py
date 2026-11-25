@@ -75,7 +75,6 @@ def render_recent_items():
 
             # 게시글 이미지 경로 조회
             image_map = get_first_item_images(supabase, item_ids)
-            image_map = {}
 
             # 로그인 사용자 북마크 조회
             user_id = st.session_state.get("user_id")
