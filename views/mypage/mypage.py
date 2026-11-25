@@ -3,11 +3,12 @@ from datetime import datetime
 from pathlib import Path
 from html import escape
 
-from DB.database import get_supabase_client
+from DB.database import get_supabase_client, clear_supabase_client
 from views.common.item_card import render_item_card
-from views.mypage.bookmark import get_bookmarks
-from views.mypage.auth import delete_user, logout_user
 from views.common.util import *
+from views.mypage.bookmark import get_bookmarks
+from views.mypage.auth import delete_user
+
 
 # --------------------------------------------------
 # CSS 불러오기
@@ -403,7 +404,16 @@ def render_delete_account_section():
 
             try:
                 delete_user(user_id)
-                logout_user()
+
+                st.session_state["logged_in"] = False
+                st.session_state["user_id"] = None
+                st.session_state["user"] = None
+                st.session_state["current_menu"] = "홈"
+
+                clear_supabase_client()
+                st.session_state.pop("supabase_access_token", None)
+                st.session_state.pop("supabase_refresh_token", None)
+
                 st.success("회원 탈퇴가 완료되었습니다.")
                 st.rerun()
 

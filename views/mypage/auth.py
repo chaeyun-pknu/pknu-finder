@@ -4,7 +4,7 @@ import time
 from datetime import datetime, timezone
 import streamlit as st
 
-from DB.database import create_auth_client, get_supabase_admin_client
+from DB.database import create_auth_client, get_supabase_admin_client, clear_supabase_client
 
 
 # OAuth 인증 후 리다이렉트 주소 설정
@@ -128,6 +128,7 @@ def _save_auth_user(user, auth_session=None, username: str | None = None) -> Non
     if auth_session is None:
         raise ValueError("인증 세션이 없습니다.")
 
+    clear_supabase_client()
     st.session_state["supabase_access_token"] = (
         auth_session.access_token
     )
@@ -206,12 +207,9 @@ def logout_user() -> None:
     st.session_state.logged_in = False
     st.session_state.current_menu = "홈"
     st.session_state.pop("oauth_flows", None)
+    clear_supabase_client()
     st.session_state.pop("supabase_access_token", None)
     st.session_state.pop("supabase_refresh_token", None)
-    # Supabase 클라이언트 캐시 제거
-    st.session_state.pop("_supabase_user_client", None)
-    st.session_state.pop("_supabase_auth_client", None)
-    st.session_state.pop("_supabase_client_access_token", None)
     st.rerun()
 
 # 이메일 로그인 처리
