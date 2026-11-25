@@ -5,14 +5,19 @@ from pathlib import Path
 import streamlit as st
 
 from DB.database import get_supabase_client
+from views.common.util import (
+    load_css,
+    upload_item_image,
+    get_signed_image_url,
+    IMAGE_BUCKET,
+    MIME_TYPES,
+)
 from views.register.detail import (
     get_item_detail,
     get_item_images,
-    get_signed_image_url,
 )
 from views.register.register import (
     AREA_LOCATIONS,
-    IMAGE_BUCKET,
     ITEM_CATEGORIES,
     MAX_DESCRIPTION_LENGTH,
     MAX_PHOTO_BYTES,
@@ -20,8 +25,6 @@ from views.register.register import (
     MAX_TAG_LENGTH,
     MAX_TAGS,
     MAX_TITLE_LENGTH,
-    MIME_TYPES,
-    upload_item_image,
 )
 
 
@@ -128,7 +131,7 @@ def save_edited_item(item_id, item_data, removed_paths, new_files):
         new_hashes.add(digest)
         photos_to_upload.append({"name": photo.name, "bytes": contents})
 
-    # 등록 기능의 upload_item_image()를 재사용합니다.
+    # 공통 이미지 업로드 함수를 사용합니다.
     uploaded_paths = []
     try:
         for photo in photos_to_upload:
@@ -230,11 +233,7 @@ def render_edit_item(item_id):
         old_date = date.today()
 
     css_path = Path(__file__).with_name("register.css")
-    if css_path.exists():
-        st.markdown(
-            f"<style>{css_path.read_text(encoding='utf-8')}</style>",
-            unsafe_allow_html=True,
-        )
+    load_css(css_path)
 
     with st.container(key="register_page"):
         st.markdown("**:blue[PKNU FINDER]**")

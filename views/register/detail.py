@@ -10,13 +10,12 @@ from pathlib import Path
 import streamlit as st
 from DB.database import get_supabase_client
 from views.mypage.bookmark import *
-from views.common.util import *
+from views.common.util import load_css, get_signed_image_url
 from views.chat.chat import get_or_create_chat_room
 
 #===============================
 # CSS 불러오기
 #===============================
-IMAGE_BUCKET = "lost-item-images"
 css_path = Path(__file__).parent / "detail.css"
 
 # ==============================
@@ -51,20 +50,6 @@ def get_item_images(item_id, supabase=None):
         if row.get("image_path")
     ]
 
-
-def get_signed_image_url(supabase, image_path):
-    """비공개 Storage 사진 접근용 1시간 유효 URL"""
-    response = (
-        supabase.storage.from_(IMAGE_BUCKET)
-        .create_signed_url(image_path, 3600)
-    )
-    if isinstance(response, dict):
-        return (
-            response.get("signedURL")
-            or response.get("signedUrl")
-            or response.get("signed_url")
-        )
-    return None
 
 def _read_only_field(label, value):
     """등록 화면 입력 필드와 같은 모양의 읽기 전용 정보"""
