@@ -1,92 +1,24 @@
 from DB.database import get_supabase_client
-from views.common.util import *
+from views.common.util import (
+    AREA_LOCATIONS,
+    ALL_LOCATIONS,
+    load_css,
+    upload_item_image,
+    IMAGE_BUCKET,
+    MIME_TYPES,
+    ITEM_CATEGORIES,
+    MAX_PHOTOS,
+    MAX_PHOTO_BYTES,
+    MAX_TAGS,
+    MAX_TAG_LENGTH,
+    MAX_TITLE_LENGTH,
+    MAX_DESCRIPTION_LENGTH,
+)
 import streamlit as st
 from pathlib import Path
 from datetime import date
 from uuid import uuid4
 from hashlib import sha256
-from views.common.util import AREA_LOCATIONS, ALL_LOCATIONS
-
-
-# ==========================================
-# 등록 화면에서 사용할 물품 카테고리
-# ==========================================
-
-ITEM_CATEGORIES = [
-    "선택해 주세요",
-    "전자기기",
-    "지갑·카드·신분증",
-    "가방·파우치",
-    "의류·액세서리",
-    "학용품·서적",
-    "생활용품·소지품",
-    "기타",
-]
-
-
-# ==========================================
-# 등록 제한 및 이미지 설정
-# ==========================================
-
-IMAGE_BUCKET = "lost-item-images"
-
-MAX_PHOTOS = 10
-MAX_PHOTO_BYTES = 5 * 1024 * 1024
-
-MAX_TAGS = 15
-MAX_TAG_LENGTH = 20
-
-MAX_TITLE_LENGTH = 60
-MAX_DESCRIPTION_LENGTH = 1000
-
-MIME_TYPES = {
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".png": "image/png",
-}
-
-
-# ==========================================
-# Supabase Storage 사진 업로드
-# ==========================================
-
-def upload_item_image(supabase, item_id, photo):
-    ext = Path(photo["name"]).suffix.lower()
-
-    if ext not in MIME_TYPES:
-        raise ValueError(
-            "지원하지 않는 이미지 형식입니다. (jpg, jpeg, png)"
-        )
-
-    image_path = f"{item_id}/{uuid4().hex}{ext}"
-    bucket = supabase.storage.from_(IMAGE_BUCKET)
-    bucket.upload(
-        path=image_path,
-        file=photo["bytes"],
-        file_options={
-            "content-type": MIME_TYPES[ext]
-        },
-    )
-
-    try:
-        response = (
-            supabase.table("lost_item_images")
-            .insert({
-                "lost_item_id": item_id,
-                "image_path": image_path,
-            })
-            .execute()
-        )
-
-        if not response.data:
-            raise RuntimeError(
-                "사진 경로 저장 결과를 확인하지 못했습니다."
-            )
-
-    except Exception:
-        bucket.remove([image_path])
-        raise
-    return image_path
 
 
 # ==========================================
