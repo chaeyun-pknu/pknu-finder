@@ -10,7 +10,12 @@ from pathlib import Path
 import streamlit as st
 from DB.database import get_supabase_client
 from views.mypage.bookmark import *
-from views.common.util import load_css, get_signed_image_url
+from views.common.util import (
+    load_css,
+    get_signed_image_url,
+    get_item_detail,
+    get_item_images,
+)
 from views.chat.chat import get_or_create_chat_room
 
 #===============================
@@ -21,36 +26,6 @@ css_path = Path(__file__).parent / "detail.css"
 # ==============================
 # DB 조회
 # =============================#
-def get_item_detail(item_id, supabase=None):
-    """게시글 ID로 본문 정보 조회"""
-    client = supabase if supabase is not None else get_supabase_client()
-    response = (
-        client.table("lost_items")
-        .select("*")
-        .eq("id", int(item_id))
-        .limit(1)
-        .execute()
-    )
-    return response.data[0] if response.data else None
-
-
-def get_item_images(item_id, supabase=None):
-    """게시글 ID로 사진 경로 조회"""
-    client = supabase if supabase is not None else get_supabase_client()
-    response = (
-        client.table("lost_item_images")
-        .select("image_path")
-        .eq("lost_item_id", int(item_id))
-        .order("id")
-        .execute()
-    )
-    return [
-        row["image_path"]
-        for row in (response.data or [])
-        if row.get("image_path")
-    ]
-
-
 def _read_only_field(label, value):
     """등록 화면 입력 필드와 같은 모양의 읽기 전용 정보"""
     label_text = escape(str(label))

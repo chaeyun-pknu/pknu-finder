@@ -1,4 +1,5 @@
 import streamlit as st
+from DB.database import get_supabase_client
 from pathlib import Path
 from uuid import uuid4
 
@@ -100,6 +101,26 @@ ALL_LOCATIONS = [
 ]
 
 
+# 등록·수정 화면에서 공통으로 사용하는 카테고리 및 입력 제한
+ITEM_CATEGORIES = [
+    "선택해 주세요",
+    "전자기기",
+    "지갑·카드·신분증",
+    "가방·파우치",
+    "의류·액세서리",
+    "학용품·서적",
+    "생활용품·소지품",
+    "기타",
+]
+
+MAX_PHOTOS = 10
+MAX_PHOTO_BYTES = 5 * 1024 * 1024
+MAX_TAGS = 15
+MAX_TAG_LENGTH = 20
+MAX_TITLE_LENGTH = 60
+MAX_DESCRIPTION_LENGTH = 1000
+
+
 # 등록·수정 화면에서 공통으로 사용하는 이미지 설정
 IMAGE_BUCKET = "lost-item-images"
 
@@ -169,3 +190,34 @@ def get_signed_image_url(supabase, image_path):
         )
 
     return None
+
+
+# 상세·수정·검색에서 공통으로 사용하는 게시글/이미지 조회
+def get_item_detail(item_id, supabase=None):
+    """게시글 ID로 본문 정보 조회"""
+    client = supabase if supabase is not None else get_supabase_client()
+    response = (
+        client.table("lost_items")
+        .select("*")
+        .eq("id", int(item_id))
+        .limit(1)
+        .execute()
+    )
+    return response.data[0] if response.data else None
+
+
+def get_item_images(item_id, supabase=None):
+    """게시글 ID로 사진 경로 조회"""
+    client = supabase if supabase is not None else get_supabase_client()
+    response = (
+        client.table("lost_item_images")
+        .select("image_path")
+        .eq("lost_item_id", int(item_id))
+        .order("id")
+        .execute()
+    )
+    return [
+        row["image_path"]
+        for row in (response.data or [])
+        if row.get("image_path")
+    ]

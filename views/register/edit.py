@@ -9,14 +9,10 @@ from views.common.util import (
     load_css,
     upload_item_image,
     get_signed_image_url,
-    IMAGE_BUCKET,
-    MIME_TYPES,
-)
-from views.register.detail import (
     get_item_detail,
     get_item_images,
-)
-from views.register.register import (
+    IMAGE_BUCKET,
+    MIME_TYPES,
     AREA_LOCATIONS,
     ITEM_CATEGORIES,
     MAX_DESCRIPTION_LENGTH,
