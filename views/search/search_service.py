@@ -9,29 +9,31 @@ def search_items(
     location="전체",
     area="전체",
     start_date=None,
-    end_date=None
+    end_date=None,
+    page=1,
+    page_size=9
 ):
-    """키워드와 검색 조건에 맞는 분실물/습득물 검색"""
+    """검색 조건에 맞는 게시글을 페이지 단위로 조회"""
 
-    keyword = keyword.strip()
+    keyword = (keyword or "").strip()
 
-    # 1. 검색 조건이 하나도 없는 경우
-    if (
-        not keyword
-        and search_type == "전체"
-        and category == "전체"
-        and area == "전체"
-        and location == "전체"
-        and start_date is None
-        and end_date is None
-    ):
-        return []
+    # 페이지 번호와 페이지당 게시글 수 보정
+    page = max(1, int(page))
+    page_size = max(1, int(page_size))
+
+    # Supabase range는 0부터 시작하며 끝 번호를 포함함
+    start_index = (page - 1) * page_size
+    end_index = start_index + page_size - 1
 
     supabase = get_supabase_client()
 
-    query = supabase.table("lost_items").select("*")
+    # 전체 게시글 조회를 기본으로 하고, 입력된 조건만 적용
+    query = supabase.table("lost_items").select(
+        "*",
+        count="exact"
+    )
 
-    # 2. 키워드 검색
+    # 1. 키워드 검색
     if keyword:
         query = query.or_(
             f"title.ilike.%{keyword}%,"
@@ -40,18 +42,18 @@ def search_items(
             f"location.ilike.%{keyword}%"
         )
 
-    # 3. 분실물 / 습득물 유형 필터
+    # 2. 분실물 / 습득물 유형 필터
     if search_type == "분실물":
         query = query.eq("status", "분실")
 
     elif search_type == "습득물":
         query = query.eq("status", "습득")
 
-    # 4. 카테고리 필터
+    # 3. 카테고리 필터
     if category != "전체":
         query = query.eq("category", category)
 
-    # 5. 장소 필터
+    # 4. 장소 필터
     if location != "전체":
         # 세부 장소를 선택한 경우
         query = query.eq("location", location)
@@ -60,30 +62,32 @@ def search_items(
         # 구역만 선택하고 세부 장소는 전체인 경우
         area_locations = AREA_LOCATIONS.get(area, [])
 
-        if area_locations:
-            query = query.in_("location", area_locations)
-        else:
-            return []
+        if not area_locations:
+            return [], 0
 
-    # 6. 시작 날짜 필터
+        query = query.in_("location", area_locations)
+
+    # 5. 시작 날짜 필터
     if start_date is not None:
         query = query.gte(
             "lost_date",
             start_date.isoformat()
         )
 
-    # 7. 종료 날짜 필터
+    # 6. 종료 날짜 필터
     if end_date is not None:
         query = query.lte(
             "lost_date",
             end_date.isoformat()
         )
 
-    # 8. 최신 게시글 순으로 정렬
+    # 7. 최신 게시글 순으로 정렬하고 현재 페이지 데이터만 조회
     result = (
         query
         .order("created_at", desc=True)
+        .range(start_index, end_index)
         .execute()
     )
 
-    return result.data
+    # 현재 페이지 게시글 목록과 전체 검색 결과 수 반환
+    return result.data, result.count or 0
