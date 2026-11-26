@@ -80,7 +80,7 @@ def render_search():
     with col2:
         search_clicked = st.button(
             "검색",
-            use_container_width=True
+            width = "stretch"
         )
 
     # 3. 검색 조건 필터
@@ -273,7 +273,7 @@ def render_search():
                                 image_url = get_signed_image_url(supabase, image_path)
 
                                 if image_url:
-                                    st.image(image_url, use_container_width=True)
+                                    st.image(image_url, width = "stretch")
                                 else:
                                     st.caption("이미지 없음")
                             else:

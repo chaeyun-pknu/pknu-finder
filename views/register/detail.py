@@ -116,7 +116,7 @@ def show_item_detail(item_id):
                 if st.button(
                     "✏️ 수정하기",
                     key=f"detail_edit_{item['id']}",
-                    use_container_width=True,
+                    width = "stretch",
                 ):
                     st.session_state["editing_item_id"] = int(item["id"])
                     st.rerun()
@@ -241,7 +241,7 @@ def show_item_detail(item_id):
                     "채팅하기",
                     key=f"detail_chat_{item['id']}",
                     type="primary",
-                    use_container_width=True,
+                    width = "stretch",
                 ):
                     try:
                         room_id = get_or_create_chat_room(

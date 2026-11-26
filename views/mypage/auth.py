@@ -384,7 +384,7 @@ def render_email_auth_form() -> None:
             )
             login_submitted = st.form_submit_button(
                 "로그인",
-                use_container_width=True,
+                width = "stretch",
                 type="primary",
             )
 
@@ -419,7 +419,7 @@ def render_email_auth_form() -> None:
             )
             signup_submitted = st.form_submit_button(
                 "회원가입",
-                use_container_width=True,
+                width = "stretch",
                 type="primary",
             )
 

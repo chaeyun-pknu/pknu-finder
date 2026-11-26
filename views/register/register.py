@@ -433,7 +433,7 @@ def render_register():
 
                                 st.image(
                                     photo["bytes"],
-                                    use_container_width=True
+                                    width = "stretch"
                                 )
 
                                 with st.container(
@@ -664,7 +664,7 @@ def render_register():
                 submitted = st.button(
                     "물품 등록하기",
                     type="primary",
-                    use_container_width=True
+                    width = "stretch"
                 )
 
             # ==================================

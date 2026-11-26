@@ -261,7 +261,7 @@ def render_edit_item(item_id):
                                 try:
                                     signed_url = get_signed_image_url(client, path)
                                     if signed_url:
-                                        st.image(signed_url, use_container_width=True)
+                                        st.image(signed_url, width = "stretch")
                                     else:
                                         st.caption("사진 미리보기를 표시할 수 없습니다.")
                                 except Exception:
@@ -367,12 +367,12 @@ def render_edit_item(item_id):
             save_col, cancel_col = st.columns([3, 1])
             with save_col:
                 submitted = st.button(
-                    "수정 내용 저장", type="primary", use_container_width=True,
+                    "수정 내용 저장", type="primary", width = "stretch",
                     key=f"{key}_submit",
                 )
             with cancel_col:
                 canceled = st.button(
-                    "취소", use_container_width=True, key=f"{key}_cancel",
+                    "취소", width = "stretch", key=f"{key}_cancel",
                 )
 
             if canceled:
