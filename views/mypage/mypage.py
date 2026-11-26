@@ -3,16 +3,16 @@ from datetime import datetime
 from pathlib import Path
 from html import escape
 
-from DB.database import get_supabase_client
-from views.common.item_card import render_item_card
-from views.mypage.bookmark import get_bookmarks
-from views.mypage.auth import delete_user, logout_user
+from DB.database import get_supabase_client, clear_supabase_client
 from views.common.util import *
+from views.mypage.auth import delete_user
+
 
 # --------------------------------------------------
 # CSS 불러오기
 # --------------------------------------------------
 css_path = Path(__file__).parent / "mypage.css"
+ITEMS_PER_PAGE = 6
 
 # --------------------------------------------------
 # 공통 함수
@@ -39,36 +39,6 @@ def get_current_user(supabase):
         return supabase.auth.get_user().user
     except Exception:
         return None
-
-#--------------------------------------------------
-# 게시글별 첫 번째 이미지 조회
-#--------------------------------------------------
-def get_item_images(supabase, item_ids):
-    if not item_ids:
-        return {}
-
-    image_map = {}
-
-    try:
-        response = (
-            supabase.table("lost_item_images")
-            .select("*")
-            .in_("lost_item_id", item_ids)
-            .order("created_at")
-            .execute()
-        )
-
-        for image in response.data or []:
-            image_map.setdefault(
-                image.get("lost_item_id"),
-                image.get("image_path")
-            )
-
-    except Exception as e:
-        print(f"게시글 이미지 조회 오류: {e}")
-
-    return image_map
-
 
 # --------------------------------------------------
 # 마이페이지 메인
@@ -125,39 +95,59 @@ def render_mypage():
         email = getattr(auth_user, "email", None) or "-"
         signup_date = format_date(profile.get("created_at"))
 
-        # 북마크 목록 조회
-        bookmarks = get_bookmarks()
+        bookmark_page_key = f"mypage_bookmarks_page_{user_id}"
+        my_items_page_key = f"mypage_my_items_page_{user_id}"
 
-        # 내가 등록한 게시글 조회
-        try:
-            response = (
-                supabase.table("lost_items")
-                .select("*")
-                .eq("user_id", str(user_id))
-                .order("created_at", desc=True)
-                .execute()
-            )
+        # 각 목록의 현재 페이지와 대표 사진만 조회합니다.
+        bookmark_query = (
+            supabase.table("bookmarks")
+            .select(f"id,lost_items!inner({ITEM_CARD_FIELDS})", count="exact")
+            .eq("user_id", str(user_id))
+            .order("id", desc=True)
+            .order("id", foreign_table="lost_items.lost_item_images")
+            .limit(1, foreign_table="lost_items.lost_item_images")
+        )
+        my_items_query = newest_items_query(supabase).eq("user_id", str(user_id))
 
-            my_items = response.data or []
+        bookmark_rows, bookmark_count, bookmark_error = load_item_page(
+            bookmark_query, bookmark_page_key, page_size=ITEMS_PER_PAGE
+        )
+        my_items, item_count, my_items_error = load_item_page(
+            my_items_query, my_items_page_key, page_size=ITEMS_PER_PAGE
+        )
 
-        except Exception as e:
-            st.error(f"게시글 조회 오류: {e}")
-            my_items = []
-
-        # 프로필 및 통계
         render_profile(
             username=username,
             email=email,
-            bookmark_count=len(bookmarks),
-            item_count=len(my_items),
+            bookmark_count=bookmark_count,
+            item_count=item_count,
             signup_date=signup_date,
         )
 
-        # 북마크 게시글
-        render_bookmark_section(supabase, bookmarks)
-
-        # 내가 등록한 게시글
-        render_my_items_section(supabase, my_items)
+        bookmarked_items = [row["lost_items"] for row in bookmark_rows]
+        render_paginated_item_cards(
+            supabase,
+            bookmarked_items,
+            bookmark_count,
+            bookmark_error,
+            page_key=bookmark_page_key,
+            page_size=ITEMS_PER_PAGE,
+            section_key="mypage_bookmarks",
+            title="🤍 내가 북마크한 게시글",
+            empty_message="아직 북마크한 게시글이 없습니다.",
+            bookmark_ids={item["id"] for item in bookmarked_items},
+        )
+        render_paginated_item_cards(
+            supabase,
+            my_items,
+            item_count,
+            my_items_error,
+            page_key=my_items_page_key,
+            page_size=ITEMS_PER_PAGE,
+            section_key="mypage_my_items",
+            title="📝 내가 등록한 게시글",
+            empty_message="아직 등록한 게시글이 없습니다.",
+        )
 
         # 회원 탈퇴
         render_delete_account_section()
@@ -174,6 +164,9 @@ def render_profile(
     item_count,
     signup_date,
 ):
+    bookmark_label = f"{bookmark_count}개" if bookmark_count is not None else "-"
+    item_label = f"{item_count}개" if item_count is not None else "-"
+
     with st.container(key="mypage_profile", border=True):
         avatar_col, info_col = st.columns([1, 5])
 
@@ -208,7 +201,7 @@ def render_profile(
                         🤍 북마크한 게시글
                     </div>
                     <div class="mypage-stat-value">
-                        {bookmark_count}개
+                        {bookmark_label}
                     </div>
                 </div>
                 """,
@@ -223,7 +216,7 @@ def render_profile(
                         📝 등록한 게시글
                     </div>
                     <div class="mypage-stat-value">
-                        {item_count}개
+                        {item_label}
                     </div>
                 </div>
                 """,
@@ -243,127 +236,6 @@ def render_profile(
                 </div>
                 """,
                 unsafe_allow_html=True
-            )
-
-
-# --------------------------------------------------
-# 북마크 게시글
-# --------------------------------------------------
-
-def render_bookmark_section(supabase, bookmarks):
-    with st.container(key="mypage_bookmarks", border=True):
-        st.subheader("🤍 내가 북마크한 게시글")
-
-        if not bookmarks:
-            st.info("아직 북마크한 게시글이 없습니다.")
-            return
-
-        item_ids = list(dict.fromkeys(
-            bookmark["item_id"]
-            for bookmark in bookmarks
-            if bookmark.get("item_id") is not None
-        ))
-
-        if not item_ids:
-            st.info("북마크한 게시글이 없습니다.")
-            return
-
-        try:
-            response = (
-                supabase.table("lost_items")
-                .select("*")
-                .in_("id", item_ids)
-                .execute()
-            )
-
-            items = response.data or []
-
-        except Exception as e:
-            st.error(f"게시글을 불러오지 못했습니다: {e}")
-            return
-
-        # 북마크 등록 순서 유지
-        item_map = {
-            item["id"]: item
-            for item in items
-        }
-
-        ordered_items = [
-            item_map[item_id]
-            for item_id in item_ids
-            if item_id in item_map
-        ]
-
-        if not ordered_items:
-            st.info("북마크한 게시글이 없습니다.")
-            return
-
-        image_map = get_item_images(
-            supabase,
-            [item["id"] for item in ordered_items]
-        )
-
-        # 공통 게시글 카드 사용
-        for start in range(0, min(len(ordered_items), 6), 2):
-            cols = st.columns(2)
-
-            for col, item in zip(
-                cols,
-                ordered_items[start:start + 2]
-            ):
-                with col:
-                    render_item_card(
-                        supabase=supabase,
-                        item=item,
-                        image_path=image_map.get(item["id"]),
-                        is_bookmarked=True,
-                        show_bookmark_button=True,
-                        key_prefix="mypage_bookmark",
-                    )
-
-        if len(ordered_items) > 6:
-            st.caption(
-                f"최근 6개 게시글을 표시하고 있습니다. "
-                f"전체 {len(ordered_items)}개"
-            )
-
-
-# --------------------------------------------------
-# 내가 등록한 게시글
-# --------------------------------------------------
-
-def render_my_items_section(supabase, my_items):
-    with st.container(key="mypage_my_items", border=True):
-        st.subheader("📝 등록한 게시글")
-
-        if not my_items:
-            st.info("아직 등록한 게시글이 없습니다.")
-            return
-
-        display_items = my_items[:6]
-
-        image_map = get_item_images(
-            supabase,
-            [item["id"] for item in display_items]
-        )
-
-        cols = st.columns(2)
-
-        for index, item in enumerate(display_items):
-            with cols[index % 2]:
-                render_item_card(
-                    supabase=supabase,
-                    item=item,
-                    image_path=image_map.get(item["id"]),
-                    is_bookmarked=False,
-                    show_bookmark_button=False,
-                    key_prefix="mypage_my_items",
-                )
-
-        if len(my_items) > 6:
-            st.caption(
-                f"최근 6개 게시글을 표시하고 있습니다. "
-                f"전체 {len(my_items)}개"
             )
 
 
@@ -403,7 +275,16 @@ def render_delete_account_section():
 
             try:
                 delete_user(user_id)
-                logout_user()
+
+                st.session_state["logged_in"] = False
+                st.session_state["user_id"] = None
+                st.session_state["user"] = None
+                st.session_state["current_menu"] = "홈"
+
+                clear_supabase_client()
+                st.session_state.pop("supabase_access_token", None)
+                st.session_state.pop("supabase_refresh_token", None)
+
                 st.success("회원 탈퇴가 완료되었습니다.")
                 st.rerun()
 

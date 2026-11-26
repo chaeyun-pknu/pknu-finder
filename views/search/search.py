@@ -7,7 +7,8 @@ from views.register.detail import (
     get_item_images,
     get_signed_image_url,
 )
-from views.common.util import AREA_LOCATIONS, ALL_LOCATIONS
+
+from views.common.util import *
 
 
 # ==========================================
@@ -123,7 +124,7 @@ def render_search():
     with col2:
         search_clicked = st.button(
             "검색",
-            use_container_width=True
+            width = "stretch"
         )
 
     # ==========================================
@@ -305,12 +306,8 @@ def render_search():
 
                     # 게시글 이미지
                     with image_col:
-
                         try:
-                            image_paths = get_item_images(
-                                item["id"],
-                                supabase
-                            )
+                            image_path = image_map.get(item["id"])
 
                             if image_paths:
                                 image_url = get_signed_image_url(
@@ -329,7 +326,7 @@ def render_search():
                                 st.caption("등록된 사진이 없습니다.")
 
                         except Exception as e:
-                            print(f"이미지 조회 오류: {e}")
+                            print(f"이미지 URL 생성 오류: {e}")
                             st.caption("이미지를 불러올 수 없습니다.")
 
                     # 게시글 정보

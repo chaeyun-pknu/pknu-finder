@@ -23,23 +23,22 @@ def register_bookmark(item_id: int) -> tuple[bool, str]:
     try:
         supabase = get_supabase_client()
 
-        # 이미 등록된 북마크인지 확인
-        existing = (
+        result = (
             supabase.table("bookmarks")
-            .select("id")
-            .eq("user_id", user_id)
-            .eq("item_id", item_id)
+            .upsert(
+                {
+                    "user_id": user_id,
+                    "item_id": item_id,
+                },
+                on_conflict="user_id,item_id",
+                ignore_duplicates=True,
+                returning="representation",
+            )
             .execute()
         )
 
-        if existing.data:
+        if not result.data:
             return False, "이미 북마크에 등록된 게시글입니다."
-
-        # 북마크 등록
-        supabase.table("bookmarks").insert({
-            "user_id": user_id,
-            "item_id": item_id,
-        }).execute()
 
         return True, "북마크에 추가했습니다."
 

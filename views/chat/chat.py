@@ -316,7 +316,7 @@ def render_chat_list():
         if st.button(
             button_label,
             key=f"chat_room_{room_id}",
-            use_container_width=True,
+            width = "stretch",
         ):
             st.session_state.selected_room = room_id
             st.session_state.chat_send_error = None

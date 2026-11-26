@@ -119,3 +119,15 @@
     border-color: #F9A8D4 !important;
     color: #BE185D !important;
 }
+
+/* 게시글 페이지 이동 */
+[class*="st-key-item_pagination_"] {
+    border-top: 1px solid #E9EFF7;
+    padding-top: 12px;
+}
+
+[class*="st-key-item_pagination_"] button[kind="primary"] {
+    background-color: #EAF2FF;
+    border-color: #9CBBEC;
+    color: #2455A0;
+}
