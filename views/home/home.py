@@ -3,13 +3,13 @@ from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from views.common.util import *
 from DB.database import get_supabase_client
-from views.common.item_card import render_item_card
 
 
 # --------------------------------------------------
 # CSS 불러오기
 # --------------------------------------------------
 css_path = Path(__file__).parent / "home.css"
+ITEMS_PER_PAGE = 6
 
 # --------------------------------------------------
 # 홈 화면
@@ -43,73 +43,41 @@ def render_home() -> None:
 # --------------------------------------------------
 
 def render_recent_items():
-    with st.container(key="home_recent_items"):
-        st.subheader("⏱ 최근 등록된 게시글")
-        st.caption("최근 7일 이내 등록된 분실물 및 습득물입니다.")
+    user_id = st.session_state.get("user_id")
+    page_key = f"home_recent_items_page_{user_id}"
+    bookmark_ids = set()
 
-        try:
-            supabase = get_supabase_client()
+    try:
+        supabase = get_supabase_client()
+        one_week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+        query = newest_items_query(supabase).gte("created_at", one_week_ago)
+        items, total, load_error = load_item_page(query, page_key, page_size=ITEMS_PER_PAGE)
 
-            # 최근 7일 기준
-            one_week_ago = (
-                datetime.now(timezone.utc) - timedelta(days=7)
-            ).isoformat()
-
-            # 최근 게시글 조회
-            item_response = (
-                supabase.table("lost_items")
-                .select("*")
-                .gte("created_at", one_week_ago)
-                .order("created_at", desc=True)
-                .limit(9)
+        if items and st.session_state.get("logged_in") and user_id:
+            bookmark_response = (
+                supabase.table("bookmarks")
+                .select("item_id")
+                .eq("user_id", str(user_id))
+                .in_("item_id", [item["id"] for item in items])
                 .execute()
             )
+            bookmark_ids = {row["item_id"] for row in (bookmark_response.data or [])}
 
-            items = item_response.data or []
+    except Exception as exc:
+        print(f"최근 게시글 조회 오류: {exc}")
+        st.error("최근 게시글을 불러오는 중 오류가 발생했습니다.")
+        return
 
-            if not items:
-                st.info("최근 7일 동안 등록된 게시글이 없습니다.")
-                return
-
-            item_ids = [item["id"] for item in items]
-
-            # 게시글 이미지 경로 조회
-            image_map = get_first_item_images(supabase, item_ids)
-
-            # 로그인 사용자 북마크 조회
-            user_id = st.session_state.get("user_id")
-            bookmark_ids = set()
-
-            if st.session_state.get("logged_in") and user_id:
-                bookmark_response = (
-                    supabase.table("bookmarks")
-                    .select("item_id")
-                    .eq("user_id", str(user_id))
-                    .in_("item_id", item_ids)
-                    .execute()
-                )
-
-                bookmark_ids = {
-                    row["item_id"]
-                    for row in (bookmark_response.data or [])
-                }
-
-            # 게시글 카드 출력
-            cols = st.columns(3)
-
-            for index, item in enumerate(items):
-                item_id = item["id"]
-
-                with cols[index % 3]:
-                    render_item_card(
-                        supabase=supabase,
-                        item=item,
-                        image_path=image_map.get(item_id),
-                        is_bookmarked=item_id in bookmark_ids,
-                        show_bookmark_button=True,
-                        key_prefix="home",
-                    )
-
-        except Exception as e:
-            print(f"최근 게시글 조회 오류: {e}")
-            st.error("최근 게시글을 불러오는 중 오류가 발생했습니다.")
+    render_paginated_item_cards(
+        supabase,
+        items,
+        total,
+        load_error,
+        page_key=page_key,
+        page_size=ITEMS_PER_PAGE,
+        section_key="home_recent_items",
+        title="⏱ 최근 등록된 게시글",
+        description="최근 7일 이내 등록된 분실물 및 습득물입니다.",
+        empty_message="최근 7일 동안 등록된 게시글이 없습니다.",
+        bookmark_ids=bookmark_ids,
+    )

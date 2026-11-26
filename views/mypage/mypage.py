@@ -3,11 +3,8 @@ from datetime import datetime
 from pathlib import Path
 from html import escape
 
-from postgrest.exceptions import APIError
 from DB.database import get_supabase_client, clear_supabase_client
-from views.common.item_card import render_item_card
 from views.common.util import *
-from views.mypage.bookmark import get_bookmarks
 from views.mypage.auth import delete_user
 
 
@@ -16,7 +13,6 @@ from views.mypage.auth import delete_user
 # --------------------------------------------------
 css_path = Path(__file__).parent / "mypage.css"
 ITEMS_PER_PAGE = 6
-ITEM_CARD_FIELDS = "id,title,status,category,location,lost_date,lost_item_images(image_path)"
 
 # --------------------------------------------------
 # 공통 함수
@@ -111,21 +107,13 @@ def render_mypage():
             .order("id", foreign_table="lost_items.lost_item_images")
             .limit(1, foreign_table="lost_items.lost_item_images")
         )
-        my_items_query = (
-            supabase.table("lost_items")
-            .select(ITEM_CARD_FIELDS, count="exact")
-            .eq("user_id", str(user_id))
-            .order("created_at", desc=True)
-            .order("id", desc=True)
-            .order("id", foreign_table="lost_item_images")
-            .limit(1, foreign_table="lost_item_images")
-        )
+        my_items_query = newest_items_query(supabase).eq("user_id", str(user_id))
 
         bookmark_rows, bookmark_count, bookmark_error = load_item_page(
-            bookmark_query, bookmark_page_key
+            bookmark_query, bookmark_page_key, page_size=ITEMS_PER_PAGE
         )
         my_items, item_count, my_items_error = load_item_page(
-            my_items_query, my_items_page_key
+            my_items_query, my_items_page_key, page_size=ITEMS_PER_PAGE
         )
 
         render_profile(
@@ -136,23 +124,26 @@ def render_mypage():
             signup_date=signup_date,
         )
 
-        render_item_section(
+        bookmarked_items = [row["lost_items"] for row in bookmark_rows]
+        render_paginated_item_cards(
             supabase,
-            [row["lost_items"] for row in bookmark_rows],
+            bookmarked_items,
             bookmark_count,
             bookmark_error,
             page_key=bookmark_page_key,
+            page_size=ITEMS_PER_PAGE,
             section_key="mypage_bookmarks",
             title="🤍 내가 북마크한 게시글",
             empty_message="아직 북마크한 게시글이 없습니다.",
-            is_bookmark_list=True,
+            bookmark_ids={item["id"] for item in bookmarked_items},
         )
-        render_item_section(
+        render_paginated_item_cards(
             supabase,
             my_items,
             item_count,
             my_items_error,
             page_key=my_items_page_key,
+            page_size=ITEMS_PER_PAGE,
             section_key="mypage_my_items",
             title="📝 내가 등록한 게시글",
             empty_message="아직 등록한 게시글이 없습니다.",
@@ -245,128 +236,6 @@ def render_profile(
                 </div>
                 """,
                 unsafe_allow_html=True
-            )
-
-
-# --------------------------------------------------
-# 게시글 목록 및 페이지 이동
-# --------------------------------------------------
-
-def load_item_page(query, page_key):
-    """삭제로 현재 페이지가 사라졌다면 남아 있는 마지막 페이지를 조회합니다."""
-    requested_page = page = st.session_state.get(page_key, 1)
-
-    try:
-        for _ in range(3):
-            start = (page - 1) * ITEMS_PER_PAGE
-            try:
-                response = query.range(start, start + ITEMS_PER_PAGE - 1).execute()
-            except APIError as exc:
-                if exc.code != "PGRST103" or page == 1:
-                    raise
-                page = 1
-                continue
-
-            total = response.count
-            last_page = max(1, (total + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
-            requested_page = min(requested_page, last_page)
-            if page == requested_page:
-                st.session_state[page_key] = page
-                return response.data or [], total, False
-
-            page = requested_page
-
-        raise RuntimeError("페이지 조회 중 게시글 목록이 변경되었습니다.")
-
-    except Exception as exc:
-        print(f"마이페이지 게시글 조회 오류 ({page_key}): {exc}")
-        return [], None, True
-
-
-def render_item_section(
-    supabase,
-    items,
-    total,
-    load_error,
-    *,
-    page_key,
-    section_key,
-    title,
-    empty_message,
-    is_bookmark_list=False,
-):
-    with st.container(key=section_key, border=True):
-        with st.container(
-            horizontal=True, horizontal_alignment="distribute", vertical_alignment="center"
-        ):
-            st.subheader(title)
-
-        if load_error:
-            st.error("게시글을 불러오지 못했습니다. 다시 시도해 주세요.")
-            return
-
-        if not items:
-            st.info(empty_message)
-            return
-
-        for start in range(0, len(items), 2):
-            for column, item in zip(st.columns(2), items[start:start + 2]):
-                images = item.get("lost_item_images") or []
-                with column:
-                    render_item_card(
-                        supabase=supabase,
-                        item=item,
-                        image_path=images[0]["image_path"] if images else None,
-                        is_bookmarked=is_bookmark_list,
-                        show_bookmark_button=is_bookmark_list,
-                        key_prefix=section_key,
-                    )
-
-        render_pagination(page_key, section_key, total)
-
-
-def render_pagination(page_key, section_key, total):
-    page_count = (total + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
-    if page_count <= 1:
-        return
-
-    page = st.session_state[page_key]
-    first_item = (page - 1) * ITEMS_PER_PAGE + 1
-    last_item = min(page * ITEMS_PER_PAGE, total)
-    first_page_number = max(1, min(page - 2, page_count - 4))
-    last_page_number = min(page_count, first_page_number + 4)
-    set_page = st.session_state.__setitem__
-
-    with st.container(key=f"{section_key}_pagination"):
-        range_column, button_column, _ = st.columns(
-            [1, 3, 1], gap="small", vertical_alignment="center"
-        )
-        with range_column:
-            st.caption(f"{first_item}–{last_item} / {total}개")
-        with button_column, st.container(
-            horizontal=True, horizontal_alignment="center", gap="xsmall"
-        ):
-            st.button(
-                "‹ 이전",
-                key=f"{page_key}_prev",
-                disabled=page == 1,
-                on_click=set_page,
-                args=(page_key, page - 1),
-            )
-            for number in range(first_page_number, last_page_number + 1):
-                st.button(
-                    str(number),
-                    key=f"{page_key}_number_{number}",
-                    type="primary" if number == page else "secondary",
-                    on_click=set_page,
-                    args=(page_key, number),
-                )
-            st.button(
-                "다음 ›",
-                key=f"{page_key}_next",
-                disabled=page == page_count,
-                on_click=set_page,
-                args=(page_key, page + 1),
             )
 
 

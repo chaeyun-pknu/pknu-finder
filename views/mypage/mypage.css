@@ -109,20 +109,6 @@
     border-color: #DCE5F2;
 }
 
-/* 목록 하단의 현재 페이지를 강조합니다. */
-.st-key-mypage_bookmarks_pagination,
-.st-key-mypage_my_items_pagination {
-    border-top: 1px solid #E9EFF7;
-    padding-top: 12px;
-}
-
-.st-key-mypage_bookmarks_pagination button[kind="primary"],
-.st-key-mypage_my_items_pagination button[kind="primary"] {
-    background-color: #EAF2FF;
-    border-color: #9CBBEC;
-    color: #2455A0;
-}
-
 /* ========================================
    회원 탈퇴
 ======================================== */

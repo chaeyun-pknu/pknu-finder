@@ -1,4 +1,5 @@
 import streamlit as st
+from postgrest.exceptions import APIError
 from DB.database import get_supabase_client
 from pathlib import Path
 from uuid import uuid4
@@ -250,3 +251,152 @@ def get_first_item_images(supabase, item_ids):
             image_map.setdefault(item_id, image_path)
 
     return image_map
+
+
+# 게시글 카드 목록의 조회 및 페이지 이동
+ITEM_CARD_FIELDS = "id,title,status,category,location,lost_date,lost_item_images(image_path)"
+
+
+def newest_items_query(supabase):
+    """최신 등록순과 게시글별 대표 사진 한 장을 지정합니다."""
+    return (
+        supabase.table("lost_items")
+        .select(ITEM_CARD_FIELDS, count="exact")
+        .order("created_at", desc=True)
+        .order("id", desc=True)
+        .order("id", foreign_table="lost_item_images")
+        .limit(1, foreign_table="lost_item_images")
+    )
+
+
+def load_item_page(query, page_key, *, page_size):
+    """지정한 개수만 조회하고, 현재 페이지가 사라지면 마지막 페이지로 이동합니다."""
+    if type(page_size) is not int or page_size < 1:
+        raise ValueError("page_size는 1 이상의 정수여야 합니다.")
+
+    requested_page = page = st.session_state.get(page_key, 1)
+
+    try:
+        for _ in range(3):
+            start = (page - 1) * page_size
+            try:
+                response = query.range(start, start + page_size - 1).execute()
+            except APIError as exc:
+                if exc.code != "PGRST103" or page == 1:
+                    raise
+                page = 1
+                continue
+
+            total = response.count
+            last_page = max(1, (total + page_size - 1) // page_size)
+            requested_page = min(requested_page, last_page)
+            if page == requested_page:
+                st.session_state[page_key] = page
+                return response.data or [], total, False
+
+            page = requested_page
+
+        raise RuntimeError("페이지 조회 중 게시글 목록이 변경되었습니다.")
+
+    except Exception as exc:
+        print(f"게시글 페이지 조회 오류 ({page_key}): {exc}")
+        return [], None, True
+
+
+def render_paginated_item_cards(
+    supabase,
+    items,
+    total,
+    load_error,
+    *,
+    page_key,
+    page_size,
+    section_key,
+    title,
+    empty_message,
+    description=None,
+    bookmark_ids=None,
+):
+    """조회한 페이지의 카드를 2열로 표시하고 페이지 이동 버튼을 추가합니다."""
+    # item_card도 util의 load_css를 사용하므로 호출 시점에 가져옵니다.
+    from views.common.item_card import render_item_card
+
+    show_bookmark_button = bookmark_ids is not None
+    bookmark_ids = bookmark_ids or set()
+
+    with st.container(key=section_key, border=True):
+        with st.container(
+            horizontal=True, horizontal_alignment="distribute", vertical_alignment="center"
+        ):
+            st.subheader(title)
+
+        if description:
+            st.caption(description)
+
+        if load_error:
+            st.error("게시글을 불러오지 못했습니다. 다시 시도해 주세요.")
+            return
+
+        if not items:
+            st.info(empty_message)
+            return
+
+        for start in range(0, len(items), 2):
+            for column, item in zip(st.columns(2), items[start:start + 2]):
+                images = item.get("lost_item_images") or []
+                with column:
+                    render_item_card(
+                        supabase=supabase,
+                        item=item,
+                        image_path=images[0]["image_path"] if images else None,
+                        is_bookmarked=item["id"] in bookmark_ids,
+                        show_bookmark_button=show_bookmark_button,
+                        key_prefix=section_key,
+                    )
+
+        _render_item_page_controls(page_key, section_key, total, page_size)
+
+
+def _render_item_page_controls(page_key, section_key, total, page_size):
+    page_count = (total + page_size - 1) // page_size
+    if page_count <= 1:
+        return
+
+    page = st.session_state[page_key]
+    first_item = (page - 1) * page_size + 1
+    last_item = min(page * page_size, total)
+    first_page_number = max(1, min(page - 2, page_count - 4))
+    last_page_number = min(page_count, first_page_number + 4)
+    set_page = st.session_state.__setitem__
+
+    with st.container(key=f"item_pagination_{section_key}"):
+        range_column, button_column, _ = st.columns(
+            [1, 3, 1], gap="small", vertical_alignment="center"
+        )
+        with range_column:
+            st.caption(f"{first_item}–{last_item} / {total}개")
+        with button_column, st.container(
+            horizontal=True, horizontal_alignment="center", gap="xsmall"
+        ):
+            st.button(
+                "‹ 이전",
+                key=f"{page_key}_prev",
+                disabled=page == 1,
+                on_click=set_page,
+                args=(page_key, page - 1),
+            )
+            for number in range(first_page_number, last_page_number + 1):
+                st.button(
+                    str(number),
+                    key=f"{page_key}_number_{number}",
+                    type="primary" if number == page else "secondary",
+                    on_click=set_page,
+                    args=(page_key, number),
+                )
+            st.button(
+                "다음 ›",
+                key=f"{page_key}_next",
+                disabled=page == page_count,
+                on_click=set_page,
+                args=(page_key, page + 1),
+            )
