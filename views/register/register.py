@@ -4,6 +4,7 @@ from views.common.util import (
     ALL_LOCATIONS,
     load_css,
     upload_item_image,
+    get_item_images,
     IMAGE_BUCKET,
     MIME_TYPES,
     ITEM_CATEGORIES,
@@ -68,7 +69,7 @@ def save_register_item(
     )
 
     if response.data:
-        return response.data[0], True
+        return response.data[0]
 
     # 재제출이면 현재 사용자의 동일한 요청으로 저장된 게시글을 확인합니다.
     existing = (
@@ -82,19 +83,53 @@ def save_register_item(
     if not existing.data:
         raise RuntimeError("게시글 저장 결과를 확인하지 못했습니다.")
 
-    return existing.data[0], False
+    return existing.data[0]
 
 
-def confirm_submission_images(supabase, item_id, expected_count):
-    """재제출 시 저장된 사진 개수를 확인합니다."""
-    response = (
-        supabase.table("lost_item_images")
-        .select("id", count="exact")
-        .eq("lost_item_id", item_id)
-        .limit(1)
-        .execute()
-    )
-    return response.count == expected_count
+def save_submission_images(supabase, item_id, photos):
+    """같은 게시글에 저장된 사진은 건너뛰고 누락된 사진만 추가합니다."""
+    if not photos:
+        return
+
+    saved_paths = set(get_item_images(item_id, supabase))
+    folder = str(item_id)
+    bucket = supabase.storage.from_(IMAGE_BUCKET)
+
+    for photo_id, photo in photos:
+        ext = Path(photo["name"]).suffix.lower()
+        if ext not in MIME_TYPES:
+            raise ValueError("지원하지 않는 이미지 형식입니다. (jpg, jpeg, png)")
+
+        # 같은 사진을 재시도해도 같은 Storage 경로를 사용합니다.
+        contents = photo["bytes"]
+        filename = f"submission-{photo_id}{ext}"
+        image_path = f"{folder}/{filename}"
+        if image_path in saved_paths:
+            continue
+
+        try:
+            bucket.upload(
+                path=image_path,
+                file=contents,
+                file_options={"content-type": MIME_TYPES[ext], "upsert": "false"},
+            )
+        except Exception:
+            # Storage에만 파일이 남았거나 다른 실행이 먼저 저장했는지 확인합니다.
+            files = bucket.list(folder, {"search": filename, "limit": 1})
+            if not any(file.get("name") == filename for file in (files or [])):
+                raise
+
+        (
+            supabase.table("lost_item_images")
+            .upsert(
+                {"lost_item_id": item_id, "image_path": image_path},
+                on_conflict="lost_item_id,image_path",
+                ignore_duplicates=True,
+                returning="minimal",
+            )
+            .execute()
+        )
+        saved_paths.add(image_path)
 
 
 # ==========================================
@@ -674,9 +709,9 @@ def render_register():
 
                         try:
                             photos_to_save = list(
-                                st.session_state.register_photos.values()
+                                st.session_state.register_photos.items()
                             )
-                            saved_item, created = save_register_item(
+                            saved_item = save_register_item(
                                 title=title,
                                 item_type=item_type,
                                 category=category,
@@ -690,20 +725,9 @@ def render_register():
                                 ],
                             )
 
-                            item_id = saved_item["id"]
-                            supabase = get_supabase_client()
-
-                            if created:
-                                for photo in photos_to_save:
-                                    upload_item_image(supabase, item_id, photo)
-                            elif not confirm_submission_images(
-                                supabase, item_id, len(photos_to_save)
-                            ):
-                                st.warning(
-                                    "게시글은 등록되었지만 사진 저장 완료를 확인하지 못했습니다. "
-                                    f"게시글 ID: {item_id}. 해당 게시글에서 사진을 확인해 주세요."
-                                )
-                                return
+                            save_submission_images(
+                                get_supabase_client(), saved_item["id"], photos_to_save
+                            )
 
                         except Exception as exc:
 
@@ -715,11 +739,9 @@ def render_register():
 
                             if saved_item is not None:
                                 st.warning(
-                                    "게시글은 저장되었지만 사진 저장이 "
-                                    "완료되지 않았을 수 있습니다. "
+                                    "게시글은 저장되었지만 사진 저장을 마치지 못했습니다. "
                                     f"게시글 ID: {saved_item['id']}. "
-                                    "중복 등록하지 말고 저장 상태를 "
-                                    "확인해 주세요."
+                                    "이 화면에서 물품 등록하기를 다시 누르면 남은 사진을 저장합니다."
                                 )
 
                         else:
