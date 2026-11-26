@@ -4,6 +4,7 @@ from views.common.util import (
     ALL_LOCATIONS,
     load_css,
     upload_item_image,
+    get_item_images,
     IMAGE_BUCKET,
     MIME_TYPES,
     ITEM_CATEGORIES,
@@ -137,17 +138,73 @@ def save_register_item(
             item_data,
             on_conflict="user_id,submission_id",
             ignore_duplicates=True,
+            returning="representation",
         )
         .execute()
     )
 
-    if not response.data:
-        raise DuplicateSubmissionError(
-            "이미 처리된 게시글 등록 요청입니다. "
-            "기존 게시글이 등록되었는지 확인해 주세요."
-        )
+    if response.data:
+        return response.data[0]
 
-    return response.data[0]
+    # 재제출이면 현재 사용자의 동일한 요청으로 저장된 게시글을 확인합니다.
+    existing = (
+        supabase.table("lost_items")
+        .select("id")
+        .eq("user_id", item_data["user_id"])
+        .eq("submission_id", item_data["submission_id"])
+        .limit(1)
+        .execute()
+    )
+    if not existing.data:
+        raise RuntimeError("게시글 저장 결과를 확인하지 못했습니다.")
+
+    return existing.data[0]
+
+
+def save_submission_images(supabase, item_id, photos):
+    """같은 게시글에 저장된 사진은 건너뛰고 누락된 사진만 추가합니다."""
+    if not photos:
+        return
+
+    saved_paths = set(get_item_images(item_id, supabase))
+    folder = str(item_id)
+    bucket = supabase.storage.from_(IMAGE_BUCKET)
+
+    for photo_id, photo in photos:
+        ext = Path(photo["name"]).suffix.lower()
+        if ext not in MIME_TYPES:
+            raise ValueError("지원하지 않는 이미지 형식입니다. (jpg, jpeg, png)")
+
+        # 같은 사진을 재시도해도 같은 Storage 경로를 사용합니다.
+        contents = photo["bytes"]
+        filename = f"submission-{photo_id}{ext}"
+        image_path = f"{folder}/{filename}"
+        if image_path in saved_paths:
+            continue
+
+        try:
+            bucket.upload(
+                path=image_path,
+                file=contents,
+                file_options={"content-type": MIME_TYPES[ext], "upsert": "false"},
+            )
+        except Exception:
+            # Storage에만 파일이 남았거나 다른 실행이 먼저 저장했는지 확인합니다.
+            files = bucket.list(folder, {"search": filename, "limit": 1})
+            if not any(file.get("name") == filename for file in (files or [])):
+                raise
+
+        (
+            supabase.table("lost_item_images")
+            .upsert(
+                {"lost_item_id": item_id, "image_path": image_path},
+                on_conflict="lost_item_id,image_path",
+                ignore_duplicates=True,
+                returning="minimal",
+            )
+            .execute()
+        )
+        saved_paths.add(image_path)
 
 
 # ==========================================
@@ -330,7 +387,7 @@ def render_register():
     ):
         clear_register_state()
 
-    # 같은 작성 화면의 재요청에는 동일한 ID를 사용합니다.
+    # 같은 작성 화면에서 재제출할 때 동일한 요청 ID를 사용합니다.
     if "register_submission_id" not in st.session_state:
         st.session_state["register_submission_id"] = str(uuid4())
 
@@ -664,7 +721,8 @@ def render_register():
                 submitted = st.button(
                     "물품 등록하기",
                     type="primary",
-                    width = "stretch"
+                    width="stretch",
+                    key=f"register_submit_{form_version}",
                 )
 
             # ==================================
@@ -723,11 +781,11 @@ def render_register():
                     else:
 
                         saved_item = None
-                        uploaded_paths = []
 
                         try:
-
-                            # 게시글 정보 저장
+                            photos_to_save = list(
+                                st.session_state.register_photos.items()
+                            )
                             saved_item = save_register_item(
                                 title=title,
                                 item_type=item_type,
@@ -742,30 +800,9 @@ def render_register():
                                 ],
                             )
 
-                            item_id = saved_item["id"]
-
-                            supabase = get_supabase_client()
-
-                            # 등록된 사진 저장
-                            photos_to_save = list(
-                                st.session_state.register_photos.values()
+                            save_submission_images(
+                                get_supabase_client(), saved_item["id"], photos_to_save
                             )
-
-                            for photo in photos_to_save:
-
-                                image_path = upload_item_image(
-                                    supabase=supabase,
-                                    item_id=item_id,
-                                    photo=photo
-                                )
-
-                                uploaded_paths.append(
-                                    image_path
-                                )
-
-                        except DuplicateSubmissionError as exc:
-
-                            st.warning(str(exc))
 
                         except Exception as exc:
 
@@ -777,11 +814,9 @@ def render_register():
 
                             if saved_item is not None:
                                 st.warning(
-                                    "게시글은 저장되었지만 사진 저장이 "
-                                    "완료되지 않았을 수 있습니다. "
+                                    "게시글은 저장되었지만 사진 저장을 마치지 못했습니다. "
                                     f"게시글 ID: {saved_item['id']}. "
-                                    "중복 등록하지 말고 저장 상태를 "
-                                    "확인해 주세요."
+                                    "이 화면에서 물품 등록하기를 다시 누르면 남은 사진을 저장합니다."
                                 )
 
                         else:
