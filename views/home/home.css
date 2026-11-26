@@ -8,6 +8,12 @@
     max-width: 1200px;
     min-width: 0;
     margin: 0 auto;
+    box-sizing: border-box;
+
+    background-color: #fff !important;
+    border: 1px solid #e2eaf7 !important;
+    border-radius: 18px !important;
+    padding: 22px !important;
 }
 
 /* ========================================
@@ -65,9 +71,9 @@
    구분선
 ======================================== */
 
-.st-key-home_recent_items {
+/*.st-key-home_recent_items {
     padding-top: 8px;
-}
+} */
 
 /* ========================================
    최근 등록된 게시글
@@ -143,7 +149,8 @@
     }
 
     .st-key-home_recent_items {
-        padding-top: 4px;
+        padding: 14px;
+        border-radius: 14px !important;
     }
 
     .st-key-home_recent_items div.stButton > button {
