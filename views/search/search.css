@@ -1,0 +1,71 @@
+/* ==========================================
+   페이지네이션 전체 영역
+   ========================================== */
+
+/* 페이지 번호 컨테이너 */
+.st-key-search-pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+}
+
+/* 페이지 번호를 가로 중앙 정렬 */
+.st-key-search-pagination div[role="radiogroup"] {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    gap: 18px;
+}
+
+
+/* ==========================================
+   페이지 번호 스타일
+   ========================================== */
+
+/* 라디오 버튼 원 숨기기 */
+.st-key-search-pagination div[role="radiogroup"] label > div:first-child {
+    display: none;
+}
+
+/* 페이지 번호 클릭 영역 */
+.st-key-search-pagination div[role="radiogroup"] label {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 4px 6px;
+    margin: 0;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+}
+
+/* 페이지 번호 기본 글자 */
+.st-key-search-pagination div[role="radiogroup"] label p {
+    font-size: 16px;
+    color: #333333;
+    margin: 0;
+}
+
+/* 현재 선택된 페이지 번호 강조 */
+.st-key-search-pagination div[role="radiogroup"] label:has(input:checked) p {
+    color: #ff4b4b;
+    font-weight: 700;
+}
+
+
+/* ==========================================
+   이전 / 다음 버튼
+   ========================================== */
+
+/* 이전·다음 버튼의 높이 통일 */
+div[data-testid="stButton"] button {
+    min-height: 38px;
+}
+
+/* 비활성화된 이전·다음 버튼 */
+div[data-testid="stButton"] button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
