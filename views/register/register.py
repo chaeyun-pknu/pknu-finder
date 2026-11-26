@@ -22,84 +22,9 @@ from uuid import uuid4
 from hashlib import sha256
 
 
-
-
-# ==========================================
-# 등록 제한 및 이미지 설정
-# ==========================================
-
-IMAGE_BUCKET = "lost-item-images"
-
-MAX_PHOTOS = 10
-MAX_PHOTO_BYTES = 5 * 1024 * 1024
-
-MAX_TAGS = 15
-MAX_TAG_LENGTH = 20
-
-MAX_TITLE_LENGTH = 60
-MAX_DESCRIPTION_LENGTH = 1000
-
-MIME_TYPES = {
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".png": "image/png",
-}
-
-
-# ==========================================
-# Supabase Storage 사진 업로드
-# ==========================================
-
-def upload_item_image(supabase, item_id, photo):
-
-    ext = Path(photo["name"]).suffix.lower()
-
-    if ext not in MIME_TYPES:
-        raise ValueError(
-            "지원하지 않는 이미지 형식입니다. (jpg, jpeg, png)"
-        )
-
-    image_path = f"{item_id}/{uuid4().hex}{ext}"
-
-    bucket = supabase.storage.from_(IMAGE_BUCKET)
-
-    bucket.upload(
-        path=image_path,
-        file=photo["bytes"],
-        file_options={
-            "content-type": MIME_TYPES[ext]
-        },
-    )
-
-    try:
-        response = (
-            supabase.table("lost_item_images")
-            .insert({
-                "lost_item_id": item_id,
-                "image_path": image_path,
-            })
-            .execute()
-        )
-
-        if not response.data:
-            raise RuntimeError(
-                "사진 경로 저장 결과를 확인하지 못했습니다."
-            )
-
-    except Exception:
-        bucket.remove([image_path])
-        raise
-
-    return image_path
-
-
 # ==========================================
 # Supabase 게시글 저장
 # ==========================================
-
-class DuplicateSubmissionError(Exception):
-    """동일한 등록 요청이 이미 DB에서 처리된 경우."""
-
 
 def save_register_item(
     title,
@@ -490,7 +415,7 @@ def render_register():
 
                                 st.image(
                                     photo["bytes"],
-                                    width = "stretch"
+                                    use_container_width=True
                                 )
 
                                 with st.container(
