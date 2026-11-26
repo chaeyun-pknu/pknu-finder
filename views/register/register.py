@@ -21,84 +21,9 @@ from uuid import uuid4
 from hashlib import sha256
 
 
-
-
-# ==========================================
-# 등록 제한 및 이미지 설정
-# ==========================================
-
-IMAGE_BUCKET = "lost-item-images"
-
-MAX_PHOTOS = 10
-MAX_PHOTO_BYTES = 5 * 1024 * 1024
-
-MAX_TAGS = 15
-MAX_TAG_LENGTH = 20
-
-MAX_TITLE_LENGTH = 60
-MAX_DESCRIPTION_LENGTH = 1000
-
-MIME_TYPES = {
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".png": "image/png",
-}
-
-
-# ==========================================
-# Supabase Storage 사진 업로드
-# ==========================================
-
-def upload_item_image(supabase, item_id, photo):
-
-    ext = Path(photo["name"]).suffix.lower()
-
-    if ext not in MIME_TYPES:
-        raise ValueError(
-            "지원하지 않는 이미지 형식입니다. (jpg, jpeg, png)"
-        )
-
-    image_path = f"{item_id}/{uuid4().hex}{ext}"
-
-    bucket = supabase.storage.from_(IMAGE_BUCKET)
-
-    bucket.upload(
-        path=image_path,
-        file=photo["bytes"],
-        file_options={
-            "content-type": MIME_TYPES[ext]
-        },
-    )
-
-    try:
-        response = (
-            supabase.table("lost_item_images")
-            .insert({
-                "lost_item_id": item_id,
-                "image_path": image_path,
-            })
-            .execute()
-        )
-
-        if not response.data:
-            raise RuntimeError(
-                "사진 경로 저장 결과를 확인하지 못했습니다."
-            )
-
-    except Exception:
-        bucket.remove([image_path])
-        raise
-
-    return image_path
-
-
 # ==========================================
 # Supabase 게시글 저장
 # ==========================================
-
-class DuplicateSubmissionError(Exception):
-    """동일한 등록 요청이 이미 DB에서 처리된 경우."""
-
 
 def save_register_item(
     title,
@@ -137,17 +62,39 @@ def save_register_item(
             item_data,
             on_conflict="user_id,submission_id",
             ignore_duplicates=True,
+            returning="representation",
         )
         .execute()
     )
 
-    if not response.data:
-        raise DuplicateSubmissionError(
-            "이미 처리된 게시글 등록 요청입니다. "
-            "기존 게시글이 등록되었는지 확인해 주세요."
-        )
+    if response.data:
+        return response.data[0], True
 
-    return response.data[0]
+    # 재제출이면 현재 사용자의 동일한 요청으로 저장된 게시글을 확인합니다.
+    existing = (
+        supabase.table("lost_items")
+        .select("id")
+        .eq("user_id", item_data["user_id"])
+        .eq("submission_id", item_data["submission_id"])
+        .limit(1)
+        .execute()
+    )
+    if not existing.data:
+        raise RuntimeError("게시글 저장 결과를 확인하지 못했습니다.")
+
+    return existing.data[0], False
+
+
+def confirm_submission_images(supabase, item_id, expected_count):
+    """재제출 시 저장된 사진 개수를 확인합니다."""
+    response = (
+        supabase.table("lost_item_images")
+        .select("id", count="exact")
+        .eq("lost_item_id", item_id)
+        .limit(1)
+        .execute()
+    )
+    return response.count == expected_count
 
 
 # ==========================================
@@ -330,7 +277,7 @@ def render_register():
     ):
         clear_register_state()
 
-    # 같은 작성 화면의 재요청에는 동일한 ID를 사용합니다.
+    # 같은 작성 화면에서 재제출할 때 동일한 요청 ID를 사용합니다.
     if "register_submission_id" not in st.session_state:
         st.session_state["register_submission_id"] = str(uuid4())
 
@@ -664,7 +611,8 @@ def render_register():
                 submitted = st.button(
                     "물품 등록하기",
                     type="primary",
-                    use_container_width=True
+                    width="stretch",
+                    key=f"register_submit_{form_version}",
                 )
 
             # ==================================
@@ -723,12 +671,12 @@ def render_register():
                     else:
 
                         saved_item = None
-                        uploaded_paths = []
 
                         try:
-
-                            # 게시글 정보 저장
-                            saved_item = save_register_item(
+                            photos_to_save = list(
+                                st.session_state.register_photos.values()
+                            )
+                            saved_item, created = save_register_item(
                                 title=title,
                                 item_type=item_type,
                                 category=category,
@@ -743,29 +691,19 @@ def render_register():
                             )
 
                             item_id = saved_item["id"]
-
                             supabase = get_supabase_client()
 
-                            # 등록된 사진 저장
-                            photos_to_save = list(
-                                st.session_state.register_photos.values()
-                            )
-
-                            for photo in photos_to_save:
-
-                                image_path = upload_item_image(
-                                    supabase=supabase,
-                                    item_id=item_id,
-                                    photo=photo
+                            if created:
+                                for photo in photos_to_save:
+                                    upload_item_image(supabase, item_id, photo)
+                            elif not confirm_submission_images(
+                                supabase, item_id, len(photos_to_save)
+                            ):
+                                st.warning(
+                                    "게시글은 등록되었지만 사진 저장 완료를 확인하지 못했습니다. "
+                                    f"게시글 ID: {item_id}. 해당 게시글에서 사진을 확인해 주세요."
                                 )
-
-                                uploaded_paths.append(
-                                    image_path
-                                )
-
-                        except DuplicateSubmissionError as exc:
-
-                            st.warning(str(exc))
+                                return
 
                         except Exception as exc:
 
